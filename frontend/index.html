@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ForzaTek AI Systems</title>
+    <title>ForzaTek AI Systems v2.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
@@ -47,16 +47,12 @@
 
         <!-- ═══════ LEFT COLUMN ═══════ -->
         <div class="column column-left">
-
-            <!-- G-Force -->
             <section class="panel">
                 <div class="panel-header"><span class="status-dot red pulse"></span><span class="icon">⟡</span>G-FORCE DYNAMICS</div>
                 <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;gap:6px">
                     <canvas id="gforce-plot" width="150" height="150"></canvas>
                     <div style="display:flex;justify-content:space-between;width:100%;font-size:8px;color:#444;font-weight:700">
-                        <span style="flex:1;text-align:center">THR</span>
-                        <span style="flex:1;text-align:center">BRK</span>
-                        <span style="flex:1;text-align:center">CLU</span>
+                        <span style="flex:1;text-align:center">THR</span><span style="flex:1;text-align:center">BRK</span><span style="flex:1;text-align:center">CLU</span>
                     </div>
                     <div style="display:flex;gap:10px;width:100%">
                         <div class="bar-meter"><div class="bar-fill green" id="bar-throttle" style="width:0%"></div></div>
@@ -69,30 +65,20 @@
                 </div>
             </section>
 
-            <!-- Lap Performance -->
             <section class="panel">
                 <div class="panel-header green-header"><span class="status-dot green pulse"></span><span class="icon">◎</span>LAP PERFORMANCE</div>
                 <div class="panel-body">
                     <div class="stat-box">
-                        <div>
-                            <div class="stat-label">CURRENT LAP</div>
-                            <div class="stat-big" id="current-lap">--:--.---</div>
-                        </div>
-                        <div style="text-align:right">
-                            <div class="stat-label">DELTA</div>
-                            <div class="stat-mid" id="lap-delta">+0.000</div>
-                        </div>
+                        <div><div class="stat-label">CURRENT LAP</div><div class="stat-big" id="current-lap">--:--.---</div></div>
+                        <div style="text-align:right"><div class="stat-label">DELTA</div><div class="stat-mid" id="lap-delta">+0.000</div></div>
                     </div>
                     <table class="lap-table">
                         <thead><tr><th>LAP</th><th style="text-align:center">TIME</th><th style="text-align:right">SPLIT</th></tr></thead>
-                        <tbody id="lap-table-body">
-                            <tr><td colspan="3" style="color:#333;text-align:center;padding:8px">Waiting for data...</td></tr>
-                        </tbody>
+                        <tbody id="lap-table-body"><tr><td colspan="3" style="color:#333;text-align:center;padding:8px">Waiting for data...</td></tr></tbody>
                     </table>
                 </div>
             </section>
 
-            <!-- Suspension -->
             <section class="panel">
                 <div class="panel-header amber-header"><span class="status-dot amber pulse"></span><span class="icon">◈</span>SUSPENSION TRAVEL</div>
                 <div class="susp-grid">
@@ -103,29 +89,20 @@
                 </div>
             </section>
 
-            <!-- Car Info -->
             <section class="panel">
                 <div class="panel-header purple-header"><span class="status-dot purple pulse"></span><span class="icon">▣</span>CAR INFO</div>
                 <div class="panel-body" style="display:flex;flex-direction:column;gap:6px">
                     <div style="display:flex;gap:8px;align-items:center">
                         <div class="display-font" id="car-class" style="font-size:22px;font-weight:900;color:#888;line-height:1">?</div>
-                        <div>
-                            <span class="display-font" id="car-pi" style="font-size:16px;font-weight:800;color:#ccc;line-height:1">---</span>
-                            <div style="font-size:7px;color:#444;font-weight:700;letter-spacing:1px">PERF INDEX</div>
-                        </div>
+                        <div><span class="display-font" id="car-pi" style="font-size:16px;font-weight:800;color:#ccc;line-height:1">---</span><div style="font-size:7px;color:#444;font-weight:700;letter-spacing:1px">PERF INDEX</div></div>
                     </div>
-                    <div style="display:flex;gap:8px">
-                        <span class="badge" id="car-drivetrain">---</span>
-                        <span class="badge" id="car-cylinders">---</span>
-                    </div>
+                    <div style="display:flex;gap:8px"><span class="badge" id="car-drivetrain">---</span><span class="badge" id="car-cylinders">---</span></div>
                 </div>
             </section>
         </div>
 
         <!-- ═══════ CENTER COLUMN ═══════ -->
         <div class="column column-center">
-
-            <!-- Viewport -->
             <section class="panel viewport-panel">
                 <div class="viewport-header">
                     <div style="display:flex;align-items:center;gap:5px"><span class="status-dot red pulse"></span><span style="font-weight:700;letter-spacing:1px">CAM_01 // FRONT_BUMPER</span></div>
@@ -133,24 +110,39 @@
                 </div>
                 <div class="viewport-screen" id="viewport">
                     <div class="scanlines"></div>
-                    <div class="corner-bracket tl"></div>
-                    <div class="corner-bracket tr"></div>
-                    <div class="corner-bracket bl"></div>
-                    <div class="corner-bracket br"></div>
-                    <img id="viewport-img" alt="" style="display:none;width:100%;height:100%;object-fit:cover;position:absolute;inset:0">
-                    <div class="viewport-placeholder" id="viewport-placeholder">⎚<br><span style="font-size:9px;letter-spacing:1px">OPENCV CAPTURE FEED</span></div>
-                    <div class="speed-overlay">
+                    <div class="corner-bracket tl"></div><div class="corner-bracket tr"></div>
+                    <div class="corner-bracket bl"></div><div class="corner-bracket br"></div>
+                    <img id="viewport-img" alt="" style="display:none;width:100%;height:100%;object-fit:cover;position:absolute;inset:0;z-index:1">
+                    <!-- NEW Phase 2: Overlay canvas sits on top of the game image -->
+                    <canvas id="overlay-canvas" style="position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none"></canvas>
+                    <div class="viewport-placeholder" id="viewport-placeholder" style="z-index:3">⎚<br><span style="font-size:9px;letter-spacing:1px">OPENCV CAPTURE FEED</span></div>
+                    <!-- NEW Phase 2: AI overlay HUD tags -->
+                    <div class="overlay-hud" id="overlay-hud" style="display:none;z-index:4">
+                        <div class="overlay-tag green-tag" id="tag-road">ROAD BOUNDS</div>
+                        <div class="overlay-tag red-tag" id="tag-obstacles">OBSTACLES: 0</div>
+                        <div class="overlay-tag" style="background:#3b9eff20;color:#3b9eff;border:1px solid #3b9eff40" id="tag-drivingline">DRIVING LINE</div>
+                        <div class="overlay-tag" id="tag-ai-active" style="position:absolute;top:8px;right:8px;background:#22c55e20;color:#22c55e;border:1px solid #22c55e40">AI: DETECTING</div>
+                        <div class="overlay-stats" id="overlay-stats-hud">YOLO: --ms | SEG: --ms | TOTAL: --ms</div>
+                    </div>
+                    <div class="speed-overlay" style="z-index:5">
                         <span class="speed-value display-font" id="speed-value">0</span>
                         <span class="speed-unit display-font">MPH</span>
                     </div>
-                    <div class="neural-link">
+                    <div class="neural-link" style="z-index:5">
                         <span class="neural-label">NEURAL_LINK_SIGNAL</span>
                         <div class="neural-bars" id="neural-bars"></div>
                     </div>
                 </div>
+                <!-- NEW Phase 2: Overlay layer toggles below viewport -->
+                <div class="overlay-toggles" id="overlay-toggles">
+                    <label class="overlay-toggle"><input type="checkbox" id="toggle-road" checked><span class="toggle-slider"></span>Road bounds</label>
+                    <label class="overlay-toggle"><input type="checkbox" id="toggle-obstacles" checked><span class="toggle-slider"></span>Obstacles</label>
+                    <label class="overlay-toggle"><input type="checkbox" id="toggle-center" checked><span class="toggle-slider"></span>Road center</label>
+                    <label class="overlay-toggle"><input type="checkbox" id="toggle-driving-line" checked><span class="toggle-slider"></span>Driving line</label>
+                    <label class="overlay-toggle"><input type="checkbox" id="toggle-stats" checked><span class="toggle-slider"></span>AI stats</label>
+                </div>
             </section>
 
-            <!-- Engine row -->
             <div class="engine-row">
                 <section class="panel engine-panel">
                     <div class="panel-body" style="display:flex;flex-direction:column;gap:8px">
@@ -160,16 +152,13 @@
                         <div class="bar-meter"><div class="bar-fill dim" id="bar-torque" style="width:0%"></div></div>
                     </div>
                 </section>
-                <section class="panel gear-panel">
-                    <canvas id="gear-gauge" width="136" height="136"></canvas>
-                </section>
+                <section class="panel gear-panel"><canvas id="gear-gauge" width="136" height="136"></canvas></section>
                 <section class="panel">
                     <div class="panel-header blue-header"><span class="status-dot blue pulse"></span><span class="icon">⊙</span>WHEEL SPEEDS</div>
                     <div class="panel-body" id="wheel-speeds"></div>
                 </section>
             </div>
 
-            <!-- Input Trace -->
             <section class="panel">
                 <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center">
                     <div style="display:flex;align-items:center;gap:5px"><span class="status-dot red pulse"></span>INPUT TRACE</div>
@@ -184,19 +173,12 @@
 
         <!-- ═══════ RIGHT COLUMN ═══════ -->
         <div class="column column-right">
-
-            <!-- AI Core Brain -->
             <section class="panel">
                 <div class="panel-header"><span class="status-dot red pulse"></span><span class="icon">◉</span>AI CORE BRAIN</div>
                 <div class="panel-body">
                     <div class="stat-box" style="margin-bottom:8px">
-                        <div>
-                            <div class="stat-label">AI STATUS</div>
-                            <div class="display-font" id="ai-status" style="font-size:13px;font-weight:800;color:#666">OFFLINE</div>
-                        </div>
-                        <div class="toggle-track">
-                            <div class="toggle-thumb"></div>
-                        </div>
+                        <div><div class="stat-label">AI STATUS</div><div class="display-font" id="ai-status" style="font-size:13px;font-weight:800;color:#666">OFFLINE</div></div>
+                        <div class="toggle-track"><div class="toggle-thumb"></div></div>
                     </div>
                     <div class="stat-grid-2">
                         <div><div class="stat-label">CONFIDENCE</div><div><span class="display-font" id="ai-confidence" style="font-size:26px;font-weight:800;color:#22c55e">--</span><span class="stat-unit">%</span></div></div>
@@ -205,6 +187,11 @@
                     <div class="stat-grid-2" style="margin-top:8px">
                         <div><div class="stat-label">LAP DELTA</div><div><span class="display-font" id="ai-lap-delta" style="font-size:26px;font-weight:800;color:#22c55e">--</span><span class="stat-unit">S</span></div></div>
                         <div><div class="stat-label">NEURAL LOAD</div><div><span class="display-font" id="ai-neural-load" style="font-size:26px;font-weight:800;color:#d0d0d0">--</span><span class="stat-unit">%</span></div></div>
+                    </div>
+                    <!-- NEW Phase 2: AI inference stats -->
+                    <div class="stat-grid-2" style="margin-top:8px;padding-top:8px;border-top:1px solid #151515">
+                        <div><div class="stat-label">YOLO INFER</div><div><span class="display-font" id="ai-yolo-ms" style="font-size:16px;font-weight:700;color:#f59e0b">--</span><span class="stat-unit">MS</span></div></div>
+                        <div><div class="stat-label">SEG INFER</div><div><span class="display-font" id="ai-seg-ms" style="font-size:16px;font-weight:700;color:#f59e0b">--</span><span class="stat-unit">MS</span></div></div>
                     </div>
                     <div style="margin-top:8px">
                         <div style="display:flex;justify-content:space-between;margin-bottom:3px">
@@ -217,7 +204,6 @@
                 </div>
             </section>
 
-            <!-- Tire Traction -->
             <section class="panel">
                 <div class="panel-header amber-header"><span class="status-dot amber pulse"></span><span class="icon">◎</span>TIRE TRACTION</div>
                 <div class="panel-body">
@@ -234,19 +220,16 @@
                 </div>
             </section>
 
-            <!-- Tire Temps -->
             <section class="panel">
                 <div class="panel-header red-header"><span class="status-dot" style="background:#ef4444;box-shadow:0 0 6px #ef4444"></span><span class="icon">▲</span>TIRE TEMPERATURES</div>
                 <div class="panel-body" id="tire-temps"></div>
             </section>
 
-            <!-- Vehicle Dynamics -->
             <section class="panel">
                 <div class="panel-header blue-header"><span class="status-dot blue pulse"></span><span class="icon">⊿</span>VEHICLE DYNAMICS</div>
                 <div class="panel-body dynamics-grid" id="dynamics-grid"></div>
             </section>
 
-            <!-- Live Map -->
             <section class="panel">
                 <div class="panel-header green-header"><span class="status-dot green pulse"></span><span class="icon">◎</span>LIVE MAP BUILDER</div>
                 <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between">
@@ -261,12 +244,13 @@
     <footer class="bottombar">
         <div class="bottombar-item"><span class="status-dot red small"></span><span class="label">GAME:</span><span class="value" id="game-name">DETECTING...</span></div>
         <div class="bottombar-item"><span class="label">LAP:</span><span class="value" id="footer-lap">0</span></div>
-        <div class="bottombar-item"><span class="label">AI:</span><span class="value" id="footer-ai" style="color:#666">OFFLINE</span></div>
+        <div class="bottombar-item"><span class="label">AI:</span><span class="value" id="footer-ai" style="color:#22c55e">DETECTING</span></div>
+        <div class="bottombar-item"><span class="label">INFER:</span><span class="value" id="footer-infer">--ms</span></div>
         <div class="bottombar-item"><span class="label">G-FORCE:</span><span class="value" id="footer-gforce">0.00G</span></div>
         <div class="bottombar-item"><span class="label">CLASS:</span><span class="value" id="footer-class">--</span></div>
         <div class="bottombar-item"><span class="label">FPS:</span><span class="value" id="footer-fps">--</span></div>
         <div class="bottombar-item"><span class="label">LATENCY:</span><span class="value" id="footer-latency">--MS</span></div>
-        <div class="bottombar-item version">V1.0.4-STABLE</div>
+        <div class="bottombar-item version">V2.0.0-PHASE2</div>
     </footer>
 
     <script src="js/app.js"></script>

@@ -1,35 +1,18 @@
 #!/usr/bin/env bash
-# ═══════════════════════════════════════════════
-#  ForzaTek AI — Launch Script (Linux/Mac/WSL)
-#  Installs dependencies and starts the server
-# ═══════════════════════════════════════════════
-
 set -e
-
 echo ""
-echo "  ╔══════════════════════════════════════════╗"
-echo "  ║         FORZATEK AI SYSTEMS v1.0.4       ║"
-echo "  ╚══════════════════════════════════════════╝"
+echo "  FORZATEK AI SYSTEMS v2.0 (Phase 1 + 2)"
+echo "  ========================================"
 echo ""
 
-# ─── Check Python ───
-if ! command -v python3 &> /dev/null; then
-    echo "[ERROR] Python3 not found. Install Python 3.10+"
-    exit 1
-fi
+if ! command -v python3 &> /dev/null; then echo "[ERROR] Python3 not found."; exit 1; fi
 
-# ─── Install dependencies ───
-echo "[SETUP] Installing Python dependencies..."
-pip3 install websockets mss opencv-python-headless numpy Pillow --quiet 2>/dev/null || \
-pip3 install websockets mss opencv-python-headless numpy Pillow --quiet --user 2>/dev/null || \
-pip3 install websockets mss opencv-python-headless numpy Pillow --quiet --break-system-packages 2>/dev/null
+echo "[SETUP] Installing dependencies..."
+pip3 install websockets mss opencv-python-headless numpy Pillow --quiet 2>/dev/null || pip3 install websockets mss opencv-python-headless numpy Pillow --quiet --break-system-packages
+pip3 install torch torchvision --quiet 2>/dev/null || pip3 install torch torchvision --quiet --break-system-packages
+pip3 install ultralytics --quiet 2>/dev/null || pip3 install ultralytics --quiet --break-system-packages
 
 echo ""
-echo "[SETUP] Dependencies installed."
-echo ""
-
-# ─── Launch ───
-echo "[START] Launching ForzaTek AI..."
 echo "[START] Dashboard: http://localhost:8080"
 echo "[START] Press Ctrl+C to stop."
 echo ""

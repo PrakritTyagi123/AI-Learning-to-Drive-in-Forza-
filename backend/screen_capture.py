@@ -1,17 +1,15 @@
 """
 ForzaTek AI — Screen Capture
 Grabs the game screen using mss, encodes with OpenCV, returns base64 JPEG.
-Runs in a separate thread to avoid blocking the event loop.
+Also provides raw numpy frames for AI inference.
 """
 
 import base64
 import time
 import threading
-import io
 
 try:
     import mss
-    import mss.tools
     import cv2
     import numpy as np
     MSS_AVAILABLE = True
@@ -25,10 +23,10 @@ class ScreenCapture:
     def __init__(self):
         self.running = False
         self.frame_b64 = None
+        self.frame_raw = None      # NEW: raw numpy BGR frame for AI inference
         self.lock = threading.Lock()
         self.thread = None
         self.fps_actual = 0
-        self._last_frame_time = 0
 
     @property
     def available(self):
@@ -52,6 +50,11 @@ class ScreenCapture:
         with self.lock:
             return self.frame_b64
 
+    def get_frame_raw(self):
+        """Return raw numpy BGR frame for AI inference."""
+        with self.lock:
+            return self.frame_raw.copy() if self.frame_raw is not None else None
+
     def _capture_loop(self):
         interval = 1.0 / CAPTURE_FPS
         frame_count = 0
@@ -60,31 +63,28 @@ class ScreenCapture:
         with mss.mss() as sct:
             monitors = sct.monitors
             if CAPTURE_MONITOR >= len(monitors):
-                print(f"[CAPTURE] Monitor {CAPTURE_MONITOR} not found, using primary")
                 monitor = monitors[1] if len(monitors) > 1 else monitors[0]
             else:
                 monitor = monitors[CAPTURE_MONITOR]
 
-            print(f"[CAPTURE] Capturing monitor: {monitor['width']}x{monitor['height']}")
+            print(f"[CAPTURE] Monitor: {monitor['width']}x{monitor['height']}")
 
             while self.running:
                 t0 = time.time()
                 try:
                     screenshot = sct.grab(monitor)
                     frame = np.array(screenshot)
-                    # mss gives BGRA, convert to BGR
                     frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
 
                     if CAPTURE_RESIZE:
                         frame = cv2.resize(frame, CAPTURE_RESIZE, interpolation=cv2.INTER_AREA)
 
-                    # Encode to JPEG
                     _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, CAPTURE_QUALITY])
                     b64 = base64.b64encode(buffer).decode('utf-8')
 
                     with self.lock:
                         self.frame_b64 = b64
-                        self._last_frame_time = time.time()
+                        self.frame_raw = frame  # Store raw frame for AI
 
                     frame_count += 1
                     elapsed = time.time() - fps_timer
@@ -97,10 +97,7 @@ class ScreenCapture:
                     print(f"[CAPTURE] Error: {e}")
                     time.sleep(0.5)
 
-                # Maintain target FPS
                 dt = time.time() - t0
                 sleep_time = interval - dt
                 if sleep_time > 0:
                     time.sleep(sleep_time)
-
-        print("[CAPTURE] Stopped")

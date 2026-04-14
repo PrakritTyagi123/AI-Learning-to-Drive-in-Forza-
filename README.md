@@ -1,93 +1,95 @@
-# ForzaTek AI Systems v1.0.4
+# ForzaTek AI Systems v2.0 — Phase 1 + Phase 2
 
-AI-powered telemetry dashboard for Forza Horizon 4, 5, 6 and Forza Motorsport.
+AI-powered telemetry dashboard with live road detection and obstacle overlays for Forza Horizon 4/5/6 and Forza Motorsport.
 
 ## Quick Start
 
-### Windows
+### Windows (RTX 4080 recommended)
 ```
 Double-click launch.bat
 ```
+First run downloads PyTorch (~2GB) + YOLOv8 weights (~50MB). Subsequent launches are instant.
 
-### Linux/Mac/WSL
+### Linux/Mac
 ```bash
-chmod +x launch.sh
-./launch.sh
+chmod +x launch.sh && ./launch.sh
 ```
 
-The dashboard opens at **http://localhost:8080**
+Dashboard: **http://localhost:8080**
 
-## Forza Setup (Data Out)
+## Forza Setup
 
-You must enable UDP telemetry in Forza:
+1. Forza → **Settings → HUD and Gameplay**
+2. **DATA OUT** → ON
+3. **DATA OUT IP** → `127.0.0.1`
+4. **DATA OUT PORT** → `5300`
 
-1. Open Forza Horizon 5 (or 4/6)
-2. Go to **Settings → HUD and Gameplay**
-3. Scroll to the bottom
-4. Set **DATA OUT** to **ON**
-5. Set **DATA OUT IP ADDRESS** to `127.0.0.1`
-6. Set **DATA OUT IP PORT** to `5300`
-7. Save and start driving!
+## What's Included
 
-> For Forza Motorsport, the setting is under **Settings → HUD → Data Out**
+### Phase 1 — Live Telemetry Dashboard
+- Real-time speed, RPM, gear, G-forces, tire data
+- Lap timing with delta
+- Live game screen capture in viewport
+- Track map builder from GPS
+- Full engine, suspension, tire traction panels
+
+### Phase 2 — AI Vision Overlays (NEW)
+- **YOLOv8-medium** detects cars, trucks, buses, people on screen
+- **DeepLabV3-ResNet50** segments the road surface
+- **Green dashed lines** = road boundaries extracted from segmentation mask
+- **Colored bounding boxes** = obstacles (red=close, amber=medium, blue=far)
+- **Purple crosshair** = road center point
+- **Toggle switches** below viewport to enable/disable each overlay layer
+- **AI inference stats** in the AI Core Brain panel (YOLO ms + SEG ms)
+
+All models are pretrained — zero custom training required. On RTX 4080: ~11ms total inference per frame.
 
 ## Architecture
 
 ```
 forzatek/
-├── launch.bat / launch.sh    ← One-click launcher
+├── launch.bat / launch.sh
 ├── requirements.txt
+├── models/                    ← Auto-downloaded on first run
 ├── backend/
-│   ├── server.py             ← Main server (HTTP + WebSocket + UDP)
-│   ├── config.py             ← All settings (ports, capture, etc.)
-│   ├── udp_telemetry.py      ← Forza packet parser (FH4/5/6 + FM)
-│   └── screen_capture.py     ← OpenCV screen grabber
+│   ├── server.py              ← Main server (HTTP + WS + UDP + AI)
+│   ├── config.py              ← All settings
+│   ├── udp_telemetry.py       ← Forza packet parser
+│   ├── screen_capture.py      ← mss + OpenCV grabber
+│   └── ai_inference.py        ← YOLOv8 + DeepLabV3 inference (NEW)
 └── frontend/
-    ├── index.html             ← Dashboard layout
-    ├── css/dashboard.css      ← Dark theme styles
-    └── js/app.js              ← WebSocket client + rendering
+    ├── index.html             ← Dashboard with overlay canvas (UPDATED)
+    ├── css/dashboard.css      ← Styles with overlay toggles (UPDATED)
+    └── js/app.js              ← WS client + overlay renderer (UPDATED)
 ```
 
-## How It Works
+## Testing Without Forza
 
-1. **Forza** sends UDP telemetry packets at 60Hz to port 5300
-2. **Python backend** receives and parses the 324-byte packets
-3. **Screen capture** grabs your monitor at ~30fps using mss + OpenCV
-4. **WebSocket server** broadcasts telemetry + frames to the browser
-5. **Dashboard** renders everything in real-time with canvas + DOM
+The dashboard works without Forza running:
+1. Launch the server — dashboard loads with empty panels
+2. Screen capture shows whatever is on your monitor
+3. AI models still run on the captured screen — you'll see road detection on any driving game, YouTube videos of driving, or even Google Street View
 
-## Ports
+## GPU Requirements
 
-| Service    | Port | Protocol  |
-|------------|------|-----------|
-| Dashboard  | 8080 | HTTP      |
-| WebSocket  | 8765 | WS        |
-| Forza Data | 5300 | UDP       |
+| GPU | AI Performance |
+|-----|---------------|
+| RTX 4080 (recommended) | ~11ms/frame, YOLOv8-medium + DeepLabV3-ResNet50 |
+| RTX 3060 | ~20ms/frame, consider YOLOv8-small |
+| No GPU | ~200ms/frame on CPU (set AI_DEVICE="cpu" in config.py) |
 
 ## Configuration
 
-Edit `backend/config.py` to change:
-- Ports (UDP, WebSocket, HTTP)
-- Screen capture settings (FPS, quality, monitor, resolution)
-- Game detection
+Edit `backend/config.py`:
+- `AI_ENABLED = False` to disable AI inference entirely
+- `AI_DEVICE = "cpu"` for CPU-only inference
+- `AI_CONFIDENCE_THRESHOLD = 0.4` to adjust detection sensitivity
+- `AI_BOUNDARY_SMOOTHING = 5` for smoother/laggier road boundaries
 
-## Telemetry Data Available
+## Ports
 
-All data comes from the Forza UDP "Dash" packet:
-- Speed, RPM, Gear, Power, Torque
-- Throttle, Brake, Clutch, Handbrake, Steering
-- G-Forces (lateral, longitudinal, total)
-- Pitch, Yaw, Roll
-- Suspension travel (4 wheels)
-- Tire slip ratios and angles (4 wheels)
-- Tire temperatures (4 wheels)  
-- Wheel rotation speeds (4 wheels)
-- Car class, Performance Index, Drivetrain, Cylinders
-- Lap times, Best lap, Delta, Position
-- GPS position (X, Y, Z) for track mapping
-- Normalized driving line and AI brake difference
-
-## Phase 2 (Coming)
-
-AI driving model — neural network reads telemetry + screen capture
-to predict steering/throttle/brake inputs.
+| Service | Port |
+|---------|------|
+| Dashboard | 8080 |
+| WebSocket | 8765 |
+| Forza UDP | 5300 |

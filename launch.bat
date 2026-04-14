@@ -1,16 +1,14 @@
 @echo off
 REM ═══════════════════════════════════════════════
-REM  ForzaTek AI — Launch Script (Windows)
-REM  Installs dependencies and starts the server
+REM  ForzaTek AI v2.0 — Launch Script (Windows)
+REM  Phase 1 (Dashboard) + Phase 2 (AI Vision)
 REM ═══════════════════════════════════════════════
 
 echo.
-echo   ╔══════════════════════════════════════════╗
-echo   ║         FORZATEK AI SYSTEMS v1.0.4       ║
-echo   ╚══════════════════════════════════════════╝
+echo   FORZATEK AI SYSTEMS v2.0 (Phase 1 + 2)
+echo   ========================================
 echo.
 
-REM ─── Check Python ───
 python --version >nul 2>&1
 if errorlevel 1 (
     echo [ERROR] Python not found. Install Python 3.10+ from python.org
@@ -18,21 +16,17 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM ─── Install dependencies ───
-echo [SETUP] Installing Python dependencies...
+echo [SETUP] Installing dependencies...
+echo [SETUP] This may take a few minutes on first run (PyTorch is ~2GB)...
 pip install websockets mss opencv-python-headless numpy Pillow --quiet --disable-pip-version-check
-if errorlevel 1 (
-    echo [WARN] Some packages may have failed. Trying with --user flag...
-    pip install websockets mss opencv-python-headless numpy Pillow --quiet --user --disable-pip-version-check
-)
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121 --quiet --disable-pip-version-check
+pip install ultralytics --quiet --disable-pip-version-check
 
 echo.
 echo [SETUP] Dependencies installed.
 echo.
-
-REM ─── Launch server ───
 echo [START] Launching ForzaTek AI...
-echo [START] Dashboard will be at: http://localhost:8080
+echo [START] Dashboard: http://localhost:8080
 echo [START] Press Ctrl+C to stop.
 echo.
 
