@@ -19,9 +19,9 @@
   --edge-hot:  #3a4452;
 
   /* Text */
-  --ink:       #d8dde4;
-  --ink-dim:   #8a93a0;
-  --ink-faint: #5a6270;
+  --ink:       #ffffff;
+  --ink-dim:   #ffffff;
+  --ink-faint: #ffffff;
 
   /* Accent (one color only) */
   --accent:     #6b8faf;
