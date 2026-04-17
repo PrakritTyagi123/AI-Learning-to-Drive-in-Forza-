@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ForzaTek — Drive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js"></script>
+</head>
+<body>
+
+<main class="page">
+
+  <header class="page-header">
+    <div>
+      <div class="crumb">Runtime / drive</div>
+      <h1>Autonomous driving</h1>
+    </div>
+    <div class="pills">
+      <span class="pill pill-warn">NOT WIRED · DRIVING PHASE</span>
+      <span class="pill" id="fpsPill">— FPS</span>
+    </div>
+  </header>
+
+  <!-- Engage bar -->
+  <section class="panel" style="margin-bottom: 10px;">
+    <div class="grid grid-2" style="margin-bottom: 12px;">
+      <button class="btn btn-ok btn-lg" id="engageBtn" disabled>▶ ENGAGE AUTOPILOT</button>
+      <button class="btn btn-danger btn-lg" id="disengageBtn" disabled>■ DISENGAGE</button>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid var(--edge); flex-wrap: wrap; gap: 10px;">
+      <div class="section-label">Emergency stop</div>
+      <div style="display: flex; gap: 4px;">
+        <kbd>⌃</kbd>
+        <kbd>⇧</kbd>
+        <kbd class="danger">Q</kbd>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel panel-warn" style="margin-bottom: 10px;">
+    <div style="display: flex; gap: 12px; align-items: flex-start;">
+      <div style="flex-shrink: 0; width: 28px; height: 28px; border: 1px solid var(--warn); color: var(--warn); font-family: var(--font-mono); font-size: 14px; display: flex; align-items: center; justify-content: center; border-radius: 2px;">!</div>
+      <div style="font-size: 12px; line-height: 1.6; color: var(--ink-dim);">
+        The driving runtime is scaffolded but not wired up yet. This page will come alive once the screen-capture loop, trained perception model, driving policy, and virtual controller output are connected in the next phase. You're seeing the UI frame so you know what to expect.
+      </div>
+    </div>
+  </section>
+
+  <!-- Split views -->
+  <section class="grid grid-2" style="margin-bottom: 10px;">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="section-label">Raw capture</div>
+        <span class="nums" style="font-size: 10px; color: var(--ink-faint);">1920 × 1080 → 512 × 288</span>
+      </div>
+      <div style="background: #080a0d; border-radius: 2px; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center;">
+        <div style="text-align: center; color: var(--ink-faint); font-size: 11px; letter-spacing: 0.08em;">
+          SCREEN CAPTURE<br><span style="color: var(--ink-faint); font-size: 10px;">mss · dxgi</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="section-label">Perception</div>
+        <span class="pill nums" id="perceptionModel">NO MODEL</span>
+      </div>
+      <div style="background: #080a0d; border-radius: 2px; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center;">
+        <div style="text-align: center; color: var(--ink-faint); font-size: 11px; letter-spacing: 0.08em;">
+          SEG + DET OVERLAY<br><span style="color: var(--ink-faint); font-size: 10px;">road · curb · wall · vehicles · signs</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Controller output (mocked) -->
+  <section class="panel" style="margin-bottom: 10px;">
+    <div class="section-label" style="margin-bottom: 12px;">Virtual controller output · vgamepad</div>
+
+    <div style="margin-bottom: 14px;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+        <span class="section-label" style="font-size: 10px;">STEER</span>
+        <span class="nums" style="font-size: 11px;" id="steerOut">0.00</span>
+      </div>
+      <div style="position: relative; height: 10px; background: var(--surface-2); border-radius: 2px; overflow: hidden;">
+        <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--edge);"></div>
+        <div id="steerBar" style="position: absolute; left: 50%; top: 0; bottom: 0; width: 0%; background: var(--accent); transition: width 0.1s, left 0.1s;"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-top: 2px;">
+        <span class="nums" style="font-size: 9px; color: var(--ink-faint);">−1.0</span>
+        <span class="nums" style="font-size: 9px; color: var(--ink-faint);">0</span>
+        <span class="nums" style="font-size: 9px; color: var(--ink-faint);">+1.0</span>
+      </div>
+    </div>
+
+    <div class="grid grid-2" style="margin-bottom: 14px;">
+      <div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span class="section-label" style="font-size: 10px;">THROTTLE</span>
+          <span class="nums" style="font-size: 11px; color: var(--ok);" id="throttleOut">0.00</span>
+        </div>
+        <div style="height: 10px; background: var(--surface-2); border-radius: 2px; overflow: hidden;">
+          <div id="throttleBar" style="height: 100%; width: 0%; background: var(--ok); transition: width 0.1s;"></div>
+        </div>
+      </div>
+      <div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span class="section-label" style="font-size: 10px;">BRAKE</span>
+          <span class="nums" style="font-size: 11px; color: var(--danger);" id="brakeOut">0.00</span>
+        </div>
+        <div style="height: 10px; background: var(--surface-2); border-radius: 2px; overflow: hidden;">
+          <div id="brakeBar" style="height: 100%; width: 0%; background: var(--danger); transition: width 0.1s;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-4" style="gap: 0; border-top: 1px solid var(--edge); padding-top: 10px;">
+      <div><div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Device</div><div class="nums" style="font-size: 11px;">XBOX_360</div></div>
+      <div><div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Command rate</div><div class="nums" style="font-size: 11px;">— Hz</div></div>
+      <div><div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Latency</div><div class="nums" style="font-size: 11px;">— ms</div></div>
+      <div><div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Override</div><div class="nums" style="font-size: 11px; color: var(--ink-dim);">none</div></div>
+    </div>
+  </section>
+
+  <!-- Runtime health -->
+  <section class="panel">
+    <div class="section-label" style="margin-bottom: 12px;">Runtime health</div>
+    <div class="grid grid-4">
+      <div class="stat">
+        <div class="stat-label">Capture FPS</div>
+        <div class="stat-value dim">—</div>
+        <div class="stat-sub">target 60</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Inference ms</div>
+        <div class="stat-value dim">—</div>
+        <div class="stat-sub">target &lt; 10</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Frame confidence</div>
+        <div class="stat-value dim">—</div>
+        <div class="stat-sub">seg + det mean</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">GPU VRAM</div>
+        <div class="stat-value dim">—</div>
+        <div class="stat-sub">MB used</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+ForzaTek.mount('drive');
+// Drive page is scaffolded for the next phase. No backend calls yet.
+</script>
+</body>
+</html>

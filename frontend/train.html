@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ForzaTek — Train</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js"></script>
+</head>
+<body>
+
+<main class="page">
+
+  <header class="page-header">
+    <div>
+      <div class="crumb">Model / train</div>
+      <h1>Training &amp; active learning</h1>
+    </div>
+    <div class="pills">
+      <span class="pill" id="trainStatus">IDLE</span>
+      <span class="pill" id="roundPill">ROUND —</span>
+    </div>
+  </header>
+
+  <!-- Active learning loop strip -->
+  <section class="panel" style="margin-bottom: 10px;">
+    <div class="section-label" style="margin-bottom: 12px;">Active learning loop</div>
+    <div id="alStrip" class="grid grid-4" style="gap: 0; border: 1px solid var(--edge);">
+      <!-- 4 stage cells populated by JS -->
+    </div>
+  </section>
+
+  <div class="grid grid-2" style="margin-bottom: 10px;">
+
+    <!-- Configuration -->
+    <div class="panel">
+      <div class="section-label" style="margin-bottom: 12px;">Training configuration</div>
+      <div class="grid grid-2" style="margin-bottom: 10px;">
+        <div class="field">
+          <label>Round</label>
+          <input type="number" class="input" id="cRound" value="1" min="1">
+        </div>
+        <div class="field">
+          <label>Epochs</label>
+          <input type="number" class="input" id="cEpochs" value="30" min="1">
+        </div>
+        <div class="field">
+          <label>Batch size</label>
+          <input type="number" class="input" id="cBatch" value="8" min="1">
+        </div>
+        <div class="field">
+          <label>Learning rate</label>
+          <input type="text" class="input" id="cLR" value="3e-4">
+        </div>
+      </div>
+      <div class="field" style="margin-bottom: 12px;">
+        <label>Resume from</label>
+        <select class="select" id="cResume">
+          <option value="">None (train from scratch)</option>
+        </select>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-accent" id="trainBtn" style="flex: 1;">START TRAINING</button>
+        <button class="btn btn-danger" id="stopBtn" style="flex: 1;" disabled>STOP</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section-label" style="margin-bottom: 10px;">Dataset ready</div>
+      <div class="grid grid-3" style="gap: 0; border: 1px solid var(--edge);">
+        <div style="padding: 10px; border-right: 1px solid var(--edge);">
+          <div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Seg labels</div>
+          <div class="nums" style="font-size: 18px; font-weight: 500;" id="dSeg">0</div>
+        </div>
+        <div style="padding: 10px; border-right: 1px solid var(--edge);">
+          <div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Det labels</div>
+          <div class="nums" style="font-size: 18px; font-weight: 500;" id="dDet">0</div>
+        </div>
+        <div style="padding: 10px;">
+          <div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Both</div>
+          <div class="nums" style="font-size: 18px; font-weight: 500; color: var(--ok);" id="dBoth">0</div>
+        </div>
+      </div>
+      <div style="font-size: 11px; color: var(--ink-faint); margin-top: 10px; line-height: 1.5;" id="dReady">
+        Need at least 50 frames with both seg + det labels to train.
+      </div>
+    </div>
+
+    <!-- Live progress -->
+    <div class="panel">
+      <div class="section-label" style="margin-bottom: 12px;">Live training progress</div>
+      <div id="progArea">
+        <div style="text-align: center; color: var(--ink-faint); font-size: 12px; padding: 40px; font-style: italic;">
+          No active training run.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Checkpoints -->
+  <section class="panel">
+    <div class="panel-header">
+      <div class="section-label">Checkpoints</div>
+      <span class="nums" style="font-size: 10px; color: var(--ink-faint);" id="ckCount">0 SAVED</span>
+    </div>
+    <div id="checkpoints" style="display: flex; flex-direction: column; gap: 6px;">
+      <div style="text-align: center; color: var(--ink-faint); font-size: 12px; padding: 24px; font-style: italic;">
+        No models trained yet.
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+ForzaTek.mount('train');
+const { api, fmt, confClass } = ForzaTek;
+
+function renderALStrip(activeRound) {
+  const stages = [
+    { n: 1, label: 'BOOTSTRAP', desc: '500 manual labels' },
+    { n: 2, label: 'ROUND 1',   desc: 'Train + queue 50' },
+    { n: 3, label: 'ROUND 2',   desc: 'Review + retrain' },
+    { n: 4, label: 'ROUND 3+',  desc: 'Iterate until plateau' },
+  ];
+  const cur = activeRound || 0;
+  document.getElementById('alStrip').innerHTML = stages.map(st => {
+    let status, cls, color;
+    if (st.n <= cur) { status = 'done'; cls = 'ok'; color = 'var(--ok)'; }
+    else if (st.n === cur + 1) { status = 'next'; cls = 'warn'; color = 'var(--warn)'; }
+    else { status = 'later'; cls = 'dim'; color = 'var(--ink-faint)'; }
+    return `
+      <div style="padding: 12px; ${st.n < 4 ? 'border-right: 1px solid var(--edge);' : ''} ${status === 'next' ? 'background: var(--warn-bg);' : ''}">
+        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+          <span class="nums" style="width: 18px; height: 18px; flex-shrink: 0; border: 1px solid ${color}; color: ${color}; font-size: 10px; display: flex; align-items: center; justify-content: center; border-radius: 2px;">${st.n}</span>
+          <span class="nums" style="font-size: 10px; letter-spacing: 0.1em; color: ${color};">${st.label}</span>
+        </div>
+        <div style="font-size: 11px; color: ${status === 'later' ? 'var(--ink-dim)' : 'var(--ink)'}; line-height: 1.4;">${st.desc}</div>
+        <div class="nums" style="font-size: 9px; color: ${color}; margin-top: 4px;">${status}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function refresh() {
+  try {
+    const p = await api.get('/api/label/progress');
+    document.getElementById('dSeg').textContent = fmt.n(p.seg_labels || 0);
+    document.getElementById('dDet').textContent = fmt.n(p.det_labels || 0);
+    const both = Math.min(p.seg_labels || 0, p.det_labels || 0);
+    document.getElementById('dBoth').textContent = fmt.n(both);
+
+    const ready = both >= 50;
+    document.getElementById('dReady').innerHTML = ready
+      ? `<span style="color: var(--ok);">Ready to train. ${both} frames with both seg + det labels.</span>`
+      : `<span style="color: var(--warn);">Need ${50 - both} more labeled frames before training.</span>`;
+    document.getElementById('trainBtn').disabled = !ready;
+  } catch (e) {}
+
+  try {
+    const s = await api.get('/api/system/stats');
+    renderALStrip(s.active_model?.round_num || 0);
+    document.getElementById('roundPill').textContent = s.active_model ? `ROUND ${s.active_model.round_num}` : 'ROUND —';
+  } catch (e) {}
+
+  try {
+    const r = await api.get('/api/train/models');
+    const models = r.models || [];
+    document.getElementById('ckCount').textContent = `${models.length} SAVED · ${models.filter(m => m.is_active).length} ACTIVE`;
+
+    const sel = document.getElementById('cResume');
+    const currentVal = sel.value;
+    sel.innerHTML = '<option value="">None (train from scratch)</option>' + models.map(m => {
+      const mx = JSON.parse(m.metrics_json || '{}');
+      const miou = mx.best_mIoU != null ? mx.best_mIoU.toFixed(3) : '—';
+      return `<option value="${m.path}">${m.name} · round ${m.round_num} · mIoU ${miou}</option>`;
+    }).join('');
+    sel.value = currentVal;
+
+    const list = document.getElementById('checkpoints');
+    if (!models.length) {
+      list.innerHTML = '<div style="text-align: center; color: var(--ink-faint); font-size: 12px; padding: 24px; font-style: italic;">No models trained yet.</div>';
+    } else {
+      list.innerHTML = models.map(m => {
+        const mx = JSON.parse(m.metrics_json || '{}');
+        const miou = mx.best_mIoU != null ? mx.best_mIoU.toFixed(3) : '—';
+        const conf = mx.mean_det_conf != null ? mx.mean_det_conf.toFixed(2) : '—';
+        const confCls = mx.mean_det_conf != null ? confClass(mx.mean_det_conf) : '';
+        const statusCls = m.is_active ? 'pill-ok' : '';
+        const statusText = m.is_active ? 'ACTIVE' : 'ARCHIVED';
+        const bg = m.is_active ? 'background: var(--surface-2); border-color: var(--ok);' : '';
+        return `
+          <div class="panel" style="padding: 10px 12px; ${bg} display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 12px; align-items: center;">
+            <div style="min-width: 0;">
+              <div class="nums truncate" style="font-size: 12px;">${m.name}</div>
+              <div class="nums" style="font-size: 10px; color: var(--ink-faint); margin-top: 2px;">round ${m.round_num} · ${fmt.n(m.trained_on)} frames · ${new Date(m.created_at * 1000).toLocaleString()}</div>
+            </div>
+            <div style="text-align: right;">
+              <div class="section-label" style="font-size: 9px;">mIoU</div>
+              <div class="nums" style="font-size: 13px; color: var(--ok);">${miou}</div>
+            </div>
+            <div style="text-align: right;">
+              <div class="section-label" style="font-size: 9px;">Det conf</div>
+              <div class="nums ${confCls ? 'conf ' + confCls : ''}" style="font-size: 13px; display: inline-block;">${conf}</div>
+            </div>
+            <span class="pill ${statusCls}">${statusText}</span>
+          </div>
+        `;
+      }).join('');
+    }
+  } catch (e) {}
+
+  try {
+    const t = await api.get('/api/train/progress');
+    if (t && t.running) {
+      document.getElementById('trainStatus').textContent = `● EPOCH ${t.current_epoch}/${t.total_epochs}`;
+      document.getElementById('trainStatus').className = 'pill pill-warn';
+      document.getElementById('stopBtn').disabled = false;
+      const pct = Math.round(100 * (t.current_epoch || 0) / (t.total_epochs || 1));
+      document.getElementById('progArea').innerHTML = `
+        <div class="grid grid-4" style="gap: 8px; margin-bottom: 14px;">
+          <div class="stat"><div class="stat-label">Train loss</div><div class="stat-value">${(t.train_loss || 0).toFixed(3)}</div></div>
+          <div class="stat"><div class="stat-label">Val mIoU</div><div class="stat-value ok">${(t.val_miou || 0).toFixed(3)}</div></div>
+          <div class="stat"><div class="stat-label">Det conf</div><div class="stat-value">${(t.val_conf || 0).toFixed(2)}</div></div>
+          <div class="stat"><div class="stat-label">ETA</div><div class="stat-value">${fmt.sec(t.eta_sec || 0)}</div></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span class="section-label" style="font-size: 10px;">Epoch ${t.current_epoch} of ${t.total_epochs}</span>
+          <span class="nums" style="font-size: 10px; color: var(--ink-faint);">${pct}%</span>
+        </div>
+        <div class="progress warn"><div style="width: ${pct}%"></div></div>
+      `;
+    } else {
+      document.getElementById('trainStatus').textContent = 'IDLE';
+      document.getElementById('trainStatus').className = 'pill';
+      document.getElementById('stopBtn').disabled = true;
+      document.getElementById('progArea').innerHTML = '<div style="text-align: center; color: var(--ink-faint); font-size: 12px; padding: 40px; font-style: italic;">No active training run.</div>';
+    }
+  } catch (e) {}
+}
+
+document.getElementById('trainBtn').addEventListener('click', async () => {
+  try {
+    await api.post('/api/train/start', {
+      round_num: parseInt(document.getElementById('cRound').value),
+      epochs: parseInt(document.getElementById('cEpochs').value),
+      batch_size: parseInt(document.getElementById('cBatch').value),
+      lr: parseFloat(document.getElementById('cLR').value),
+      resume: document.getElementById('cResume').value || null,
+    });
+    refresh();
+  } catch (e) { alert('Start failed: ' + e.message); }
+});
+document.getElementById('stopBtn').addEventListener('click', async () => {
+  try { await api.post('/api/train/cancel'); refresh(); } catch (e) {}
+});
+
+setInterval(refresh, 2500); refresh();
+</script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Data (runtime; do not commit)
+data/forzatek.db
+data/videos/*
+!data/videos/.gitkeep
+data/settings.json
+
+# Models (large; do not commit)
+models/*.pt
+!models/.gitkeep
+
+# Training progress snapshot
+training/_progress.json
+
+# Misc
+*.log

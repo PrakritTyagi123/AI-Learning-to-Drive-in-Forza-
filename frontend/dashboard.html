@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ForzaTek — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js"></script>
+</head>
+<body>
+
+<main class="page">
+
+  <header class="page-header">
+    <div>
+      <div class="crumb">Overview / dashboard</div>
+      <h1>System overview</h1>
+    </div>
+    <div class="pills">
+      <span class="pill" id="versionsPill">— VERSIONS</span>
+      <span class="pill pill-accent nums" id="clockPill">--:--:--</span>
+    </div>
+  </header>
+
+  <section class="grid grid-4" style="margin-bottom: 10px;">
+    <div class="stat">
+      <div class="stat-label">Total frames</div>
+      <div class="stat-value" id="mTotal">0</div>
+      <div class="stat-sub" id="mTotalSub">0 sources</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Labeled</div>
+      <div class="stat-value ok" id="mLabeled">0</div>
+      <div class="stat-sub" id="mLabeledSub">0% complete</div>
+      <div class="stat-bar ok"><div id="mLabeledBar" style="width: 0%"></div></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Review queue</div>
+      <div class="stat-value warn" id="mQueue">0</div>
+      <div class="stat-sub" id="mQueueSub">0 proposals awaiting</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Unlabeled</div>
+      <div class="stat-value dim" id="mUnlabeled">0</div>
+      <div class="stat-sub">ready for pipeline</div>
+    </div>
+  </section>
+
+  <section class="grid grid-2" style="margin-bottom: 10px;">
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="section-label">Active model</div>
+        <span class="pill" id="mStatus">NO MODEL</span>
+      </div>
+      <div id="mDetail" style="font-size: 12px; color: var(--ink-dim); line-height: 1.5; margin-bottom: 12px;">
+        No model has been trained yet. Label ~500 frames, then run <code class="nums" style="color: var(--accent); background: var(--bg); padding: 1px 5px; border-radius: 2px;">python -m scripts.run_pipeline --round 1</code>
+      </div>
+      <div class="grid grid-4" style="padding-top: 10px; border-top: 1px solid var(--edge); gap: 8px;">
+        <div><div class="section-label" style="font-size: 9px; margin-bottom: 3px;">Name</div><div class="nums" style="font-size: 11px;" id="mName">—</div></div>
+        <div><div class="section-label" style="font-size: 9px; margin-bottom: 3px;">Round</div><div class="nums" style="font-size: 11px;" id="mRound">—</div></div>
+        <div><div class="section-label" style="font-size: 9px; margin-bottom: 3px;">Trained on</div><div class="nums" style="font-size: 11px;" id="mTrained">—</div></div>
+        <div><div class="section-label" style="font-size: 9px; margin-bottom: 3px;">mIoU · conf</div><div class="nums" style="font-size: 11px;"><span id="mMiou">—</span> · <span id="mConf">—</span></div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-label" style="margin-bottom: 12px;">Pipeline status</div>
+      <div id="pipelineSteps" style="display: flex; flex-direction: column; gap: 6px;">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+  </section>
+
+  <section class="panel" style="margin-bottom: 10px;">
+    <div class="panel-header">
+      <div class="section-label">Frames by game version</div>
+      <a href="/train" class="pill">TRAIN →</a>
+    </div>
+    <div class="grid grid-3" style="border-top: 1px solid var(--edge); padding-top: 0; gap: 0;">
+      <div style="padding: 12px; border-right: 1px solid var(--edge);">
+        <div class="nums" style="font-size: 24px; font-weight: 500;" id="vFH4">0</div>
+        <div class="section-label" style="margin-top: 4px;">FH4</div>
+      </div>
+      <div style="padding: 12px; border-right: 1px solid var(--edge);">
+        <div class="nums" style="font-size: 24px; font-weight: 500;" id="vFH5">0</div>
+        <div class="section-label" style="margin-top: 4px;">FH5</div>
+      </div>
+      <div style="padding: 12px;">
+        <div class="nums" style="font-size: 24px; font-weight: 500;" id="vFH6">0</div>
+        <div class="section-label" style="margin-top: 4px;">FH6</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid grid-3">
+    <a href="/record" class="panel" style="text-decoration: none; color: inherit; transition: border-color 0.15s;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+        <span class="section-label" style="font-size: 9px;">01 · DATA</span>
+        <span style="color: var(--ink-dim);">→</span>
+      </div>
+      <div style="font-size: 14px; font-weight: 500; margin-bottom: 4px;">Record live</div>
+      <div style="font-size: 11px; color: var(--ink-faint); line-height: 1.5;">Capture frames from live Forza with dedup and diversity tracking.</div>
+    </a>
+    <a href="/ingest" class="panel" style="text-decoration: none; color: inherit;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+        <span class="section-label" style="font-size: 9px;">02 · DATA</span>
+        <span style="color: var(--ink-dim);">→</span>
+      </div>
+      <div style="font-size: 14px; font-weight: 500; margin-bottom: 4px;">Ingest video</div>
+      <div style="font-size: 11px; color: var(--ink-faint); line-height: 1.5;">Pull frames from YouTube URLs or local video files, HUD-masked.</div>
+    </a>
+    <a href="/label" class="panel" style="text-decoration: none; color: inherit;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+        <span class="section-label" style="font-size: 9px;">03 · DATA</span>
+        <span style="color: var(--ink-dim);">→</span>
+      </div>
+      <div style="font-size: 14px; font-weight: 500; margin-bottom: 4px;">Label tool</div>
+      <div style="font-size: 11px; color: var(--ink-faint); line-height: 1.5;">Paint masks and draw boxes. Active-learning driven sampling.</div>
+    </a>
+  </section>
+
+</main>
+
+<script>
+ForzaTek.mount('dashboard');
+const { api, fmt } = ForzaTek;
+
+async function refresh() {
+  try {
+    const s = await api.get('/api/system/stats');
+    document.getElementById('mTotal').textContent = fmt.n(s.total_frames);
+    const srcCount = Object.keys(s.frames_by_version || {}).length;
+    document.getElementById('mTotalSub').textContent = `${srcCount} version${srcCount === 1 ? '' : 's'} in DB`;
+
+    document.getElementById('mLabeled').textContent = fmt.n(s.labeled_frames);
+    const pct = s.total_frames ? s.labeled_frames / s.total_frames : 0;
+    document.getElementById('mLabeledSub').textContent = fmt.pct(pct) + ' complete';
+    document.getElementById('mLabeledBar').style.width = (pct * 100) + '%';
+
+    document.getElementById('mQueue').textContent = fmt.n(s.queue_size);
+    document.getElementById('mQueueSub').textContent = `${fmt.n(s.proposed_frames)} proposals awaiting`;
+
+    const unlabeled = Math.max(0, s.total_frames - s.labeled_frames - s.proposed_frames);
+    document.getElementById('mUnlabeled').textContent = fmt.n(unlabeled);
+
+    // Active model
+    if (s.active_model) {
+      const m = s.active_model;
+      const mx = JSON.parse(m.metrics_json || '{}');
+      document.getElementById('mStatus').textContent = 'ACTIVE';
+      document.getElementById('mStatus').className = 'pill pill-ok';
+      document.getElementById('mDetail').innerHTML =
+        `Round ${m.round_num} checkpoint, trained on ${m.trained_on} frames. Used for auto-labeling and active-learning selection.`;
+      document.getElementById('mName').textContent = m.name;
+      document.getElementById('mRound').textContent = m.round_num;
+      document.getElementById('mTrained').textContent = fmt.n(m.trained_on);
+      document.getElementById('mMiou').textContent = mx.best_mIoU != null ? mx.best_mIoU.toFixed(3) : '—';
+      document.getElementById('mConf').textContent = mx.mean_det_conf != null ? mx.mean_det_conf.toFixed(2) : '—';
+    }
+
+    // Versions
+    const by = s.frames_by_version || {};
+    document.getElementById('vFH4').textContent = fmt.n(by.fh4 || 0);
+    document.getElementById('vFH5').textContent = fmt.n(by.fh5 || 0);
+    document.getElementById('vFH6').textContent = fmt.n(by.fh6 || 0);
+    const live = [];
+    if (by.fh4) live.push('FH4');
+    if (by.fh5) live.push('FH5');
+    if (by.fh6) live.push('FH6');
+    document.getElementById('versionsPill').textContent = live.length ? live.join(' · ') : 'NO DATA';
+
+    renderPipeline(s);
+  } catch (e) {}
+}
+
+function renderPipeline(s) {
+  const steps = [
+    { n: 1, label: 'Collect frames',        done: s.total_frames   >= 500  },
+    { n: 2, label: 'Label 500 manually',    done: s.labeled_frames >= 500  },
+    { n: 3, label: 'Train round 1',         done: !!s.active_model && s.active_model.round_num >= 1 },
+    { n: 4, label: 'Review uncertain',      done: !!s.active_model && s.active_model.round_num >= 2 },
+    { n: 5, label: 'Iterate to round 3+',   done: !!s.active_model && s.active_model.round_num >= 3 },
+  ];
+  // Mark the first undone as "current"
+  let marked = false;
+  for (const st of steps) {
+    st.current = !st.done && !marked;
+    if (st.current) marked = true;
+  }
+  document.getElementById('pipelineSteps').innerHTML = steps.map(st => {
+    const cls = st.done ? 'ok' : (st.current ? 'warn' : 'dim');
+    const border = st.done ? 'var(--ok)' : (st.current ? 'var(--warn)' : 'var(--edge)');
+    const color = st.done ? 'var(--ok)' : (st.current ? 'var(--warn)' : 'var(--ink-faint)');
+    const status = st.done ? 'done' : (st.current ? 'current' : 'pending');
+    return `
+      <div style="display: flex; align-items: center; gap: 10px; font-size: 12px;">
+        <span class="nums" style="width: 18px; height: 18px; flex-shrink: 0; border: 1px solid ${border}; color: ${color}; font-size: 10px; display: flex; align-items: center; justify-content: center; border-radius: 2px;">${st.n}</span>
+        <span style="flex: 1; color: ${st.done || st.current ? 'var(--ink)' : 'var(--ink-dim)'};">${st.label}</span>
+        <span class="nums" style="font-size: 10px; color: ${color};">${status}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function tickClock() {
+  const d = new Date();
+  document.getElementById('clockPill').textContent = d.toTimeString().slice(0, 8);
+}
+setInterval(tickClock, 1000); tickClock();
+setInterval(refresh, 2500); refresh();
+</script>
+</body>
+</html>

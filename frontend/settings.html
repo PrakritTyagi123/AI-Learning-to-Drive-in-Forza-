@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ForzaTek — Settings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js"></script>
+</head>
+<body>
+
+<main class="page">
+
+  <header class="page-header">
+    <div>
+      <div class="crumb">System / settings</div>
+      <h1>Settings</h1>
+    </div>
+    <div class="pills">
+      <span class="pill" id="savedPill">SAVED</span>
+    </div>
+  </header>
+
+  <section class="panel" style="margin-bottom: 10px;">
+    <div class="section-label" style="margin-bottom: 12px;">General</div>
+    <div class="grid grid-2">
+      <div class="field">
+        <label>Default game version</label>
+        <select class="select" data-key="default_game_version">
+          <option value="fh4">Forza Horizon 4</option>
+          <option value="fh5">Forza Horizon 5</option>
+          <option value="fh6">Forza Horizon 6</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Unit system</label>
+        <select class="select" data-key="unit_system">
+          <option value="imperial">Imperial (MPH)</option>
+          <option value="metric">Metric (km/h)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Backend host</label>
+        <input class="input" data-key="backend_host" value="http://localhost:8000">
+      </div>
+      <div class="field">
+        <label>Auto-save interval (sec)</label>
+        <input class="input" data-key="autosave" value="30">
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" style="margin-bottom: 10px;">
+    <div class="section-label" style="margin-bottom: 12px;">Paths</div>
+    <div class="field" style="margin-bottom: 10px;">
+      <label>Database</label>
+      <input class="input" data-key="db_path" value="data/forzatek.db">
+    </div>
+    <div class="field" style="margin-bottom: 10px;">
+      <label>Model checkpoints directory</label>
+      <input class="input" data-key="models_path" value="models/">
+    </div>
+    <div class="field">
+      <label>Video cache directory (yt-dlp downloads)</label>
+      <input class="input" data-key="videos_path" value="data/videos/">
+    </div>
+  </section>
+
+  <section class="panel" style="margin-bottom: 10px;">
+    <div class="section-label" style="margin-bottom: 12px;">Telemetry &amp; capture</div>
+    <div class="grid grid-2">
+      <div class="field">
+        <label>Forza UDP port</label>
+        <input class="input" data-key="udp_port" value="5300">
+      </div>
+      <div class="field">
+        <label>Screen capture backend</label>
+        <select class="select" data-key="capture_backend">
+          <option value="mss">mss (cross-platform)</option>
+          <option value="dxgi">dxgi (Windows, faster)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Capture monitor</label>
+        <select class="select" data-key="capture_monitor">
+          <option value="1">Monitor 1 · 1920×1080</option>
+          <option value="2">Monitor 2</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Target capture FPS</label>
+        <input class="input" data-key="capture_fps" value="60">
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" style="margin-bottom: 10px;">
+    <div class="section-label" style="margin-bottom: 12px;">GPU &amp; inference</div>
+    <div class="grid grid-2">
+      <div class="field">
+        <label>Training device</label>
+        <select class="select" data-key="train_device">
+          <option value="cuda:0">CUDA:0</option>
+          <option value="cuda:1">CUDA:1</option>
+          <option value="cpu">CPU</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Inference device</label>
+        <select class="select" data-key="infer_device">
+          <option value="cuda:0">CUDA:0</option>
+          <option value="cuda:1">CUDA:1</option>
+          <option value="cpu">CPU</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Inference precision</label>
+        <select class="select" data-key="precision">
+          <option value="fp16">FP16 (faster)</option>
+          <option value="fp32">FP32</option>
+          <option value="int8">INT8 (TensorRT)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Pre-label confidence threshold</label>
+        <input class="input" data-key="prelabel_thr" value="0.35">
+      </div>
+      <div class="field">
+        <label>Active-learning queue size</label>
+        <input class="input" data-key="queue_size" value="50">
+      </div>
+      <div class="field">
+        <label>Detection confidence threshold</label>
+        <input class="input" data-key="det_conf_thr" value="0.30">
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" style="margin-bottom: 10px;">
+    <div class="section-label" style="margin-bottom: 12px;">Hotkeys</div>
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 12px; background: var(--surface-2); border-radius: 2px;">
+        <span style="font-size: 12px;">Emergency disengage (driving)</span>
+        <div style="display: flex; gap: 4px;"><kbd>⌃</kbd><kbd>⇧</kbd><kbd class="danger">Q</kbd></div>
+      </div>
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 12px; background: var(--surface-2); border-radius: 2px;">
+        <span style="font-size: 12px;">Pause AI driving</span>
+        <div style="display: flex; gap: 4px;"><kbd>SPACE</kbd></div>
+      </div>
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 12px; background: var(--surface-2); border-radius: 2px;">
+        <span style="font-size: 12px;">Label · save &amp; next</span>
+        <div style="display: flex; gap: 4px;"><kbd>SPACE</kbd></div>
+      </div>
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 12px; background: var(--surface-2); border-radius: 2px;">
+        <span style="font-size: 12px;">Label · toggle mode (seg/det)</span>
+        <div style="display: flex; gap: 4px;"><kbd>TAB</kbd></div>
+      </div>
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 12px; background: var(--surface-2); border-radius: 2px;">
+        <span style="font-size: 12px;">Label · undo brush stroke</span>
+        <div style="display: flex; gap: 4px;"><kbd>⌃</kbd><kbd>Z</kbd></div>
+      </div>
+    </div>
+  </section>
+
+  <div style="display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+    <button class="btn" id="resetBtn">RESET TO DEFAULTS</button>
+    <div style="display: flex; gap: 6px;">
+      <button class="btn" id="cancelBtn">CANCEL</button>
+      <button class="btn btn-ok" id="saveBtn">SAVE CHANGES</button>
+    </div>
+  </div>
+
+</main>
+
+<script>
+ForzaTek.mount('settings');
+const { api } = ForzaTek;
+
+const FIELDS = [...document.querySelectorAll('[data-key]')];
+let originalValues = {};
+let dirty = false;
+
+function snapshot() {
+  const out = {};
+  FIELDS.forEach(f => { out[f.dataset.key] = f.value; });
+  return out;
+}
+function markDirty() {
+  dirty = true;
+  document.getElementById('savedPill').textContent = '● UNSAVED CHANGES';
+  document.getElementById('savedPill').className = 'pill pill-warn';
+}
+function markClean() {
+  dirty = false;
+  document.getElementById('savedPill').textContent = 'SAVED';
+  document.getElementById('savedPill').className = 'pill';
+}
+
+FIELDS.forEach(f => {
+  f.addEventListener('input', markDirty);
+  f.addEventListener('change', markDirty);
+});
+
+async function load() {
+  try {
+    const s = await api.get('/api/system/settings');
+    FIELDS.forEach(f => {
+      const k = f.dataset.key;
+      if (s && s[k] != null) f.value = s[k];
+    });
+    originalValues = snapshot();
+    markClean();
+  } catch (e) {
+    // Backend may not expose settings yet — just use the defaults shown in the form
+    originalValues = snapshot();
+  }
+}
+
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  try {
+    await api.post('/api/system/settings', snapshot());
+    originalValues = snapshot();
+    markClean();
+  } catch (e) {
+    alert('Save failed: ' + e.message);
+  }
+});
+document.getElementById('cancelBtn').addEventListener('click', () => {
+  FIELDS.forEach(f => { f.value = originalValues[f.dataset.key]; });
+  markClean();
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('Reset all settings to defaults?')) return;
+  location.reload();
+});
+
+load();
+</script>
+</body>
+</html>

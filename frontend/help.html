@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ForzaTek — Help</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js"></script>
+<style>
+  .stage-row {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--edge);
+  }
+  .stage-row:last-child { border-bottom: none; }
+  .stage-badge {
+    width: 26px; height: 26px;
+    border-radius: 2px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+  }
+  .stage-badge.done { border: 1px solid var(--ok); color: var(--ok); }
+  .stage-badge.pending { border: 1px solid var(--warn); color: var(--warn); }
+  .stage-label {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 3px;
+  }
+  .stage-desc {
+    font-size: 11px;
+    color: var(--ink-dim);
+    line-height: 1.55;
+  }
+  .troubleshoot-item {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--edge);
+  }
+  .troubleshoot-item:last-child { border-bottom: none; }
+  .troubleshoot-item .q {
+    font-size: 12px; font-weight: 500; margin-bottom: 4px;
+  }
+  .troubleshoot-item .a {
+    font-size: 11px; color: var(--ink-dim); line-height: 1.5;
+  }
+  .ref-tile {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--surface-2);
+    border-radius: 2px;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.15s;
+  }
+  .ref-tile:hover { background: var(--surface-3); }
+  code.inline {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    background: var(--bg);
+    color: var(--accent);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+</style>
+</head>
+<body>
+
+<main class="page">
+
+  <header class="page-header">
+    <div>
+      <div class="crumb">System / help</div>
+      <h1>Help &amp; workflow guide</h1>
+    </div>
+    <div class="pills">
+      <span class="pill nums">v1.0</span>
+    </div>
+  </header>
+
+  <section class="panel" style="margin-bottom: 10px;">
+    <div class="section-label" style="margin-bottom: 10px;">What this app does</div>
+    <p style="font-size: 13px; line-height: 1.6; margin-bottom: 10px;">
+      ForzaTek is a data collection, annotation, training, and deployment platform for building a custom perception model that lets an AI drive in Forza Horizon. You collect frames, label a few hundred, train a model, let it label the rest, iterate, then eventually use the trained model to drive the car.
+    </p>
+    <p style="font-size: 12px; line-height: 1.6; color: var(--ink-dim); margin: 0;">
+      This app is the foundation. Perception and active-learning are fully implemented (stages A-D). Live screen capture, driving policy, and virtual controller output (stages E-G) will be wired up in the next phase.
+    </p>
+  </section>
+
+  <section class="panel" style="margin-bottom: 10px;">
+    <div class="section-label" style="margin-bottom: 10px;">Workflow · seven stages</div>
+    <div style="display: flex; flex-direction: column;">
+      <div class="stage-row">
+        <div class="stage-badge done">A</div>
+        <div>
+          <div class="stage-label">Collect frames · record or ingest</div>
+          <div class="stage-desc">Record live Forza via UDP + screen capture, or paste YouTube URLs, or drop <code class="inline">.mp4</code> files. Target 2,000–5,000 raw frames across different biomes, weather, and time of day.</div>
+        </div>
+      </div>
+      <div class="stage-row">
+        <div class="stage-badge done">B</div>
+        <div>
+          <div class="stage-label">Label ~500 frames by hand</div>
+          <div class="stage-desc">Paint road / curb / wall / offroad masks. Draw bounding boxes on vehicles and signs. Use pre-label to seed each frame with a rough guess, then correct. Budget 8–12 hours.</div>
+        </div>
+      </div>
+      <div class="stage-row">
+        <div class="stage-badge done">C</div>
+        <div>
+          <div class="stage-label">Train round 1</div>
+          <div class="stage-desc">20 minutes on an RTX 4080. EfficientNet-B1 backbone with segmentation + detection heads. Expect mIoU ~0.64 on round 1. Not great yet, but the foundation is there.</div>
+        </div>
+      </div>
+      <div class="stage-row">
+        <div class="stage-badge done">D</div>
+        <div>
+          <div class="stage-label">Active learning · rounds 2, 3, 4</div>
+          <div class="stage-desc">Model labels 500 more frames automatically. Queues the 50 most uncertain for your review. You accept or fix. Retrain. Repeat until mIoU plateaus (~0.85+).</div>
+        </div>
+      </div>
+      <div class="stage-row">
+        <div class="stage-badge pending">E</div>
+        <div>
+          <div class="stage-label">Live perception · next phase</div>
+          <div class="stage-desc">mss or DXGI screen capture, runs the trained model at 60 FPS. Outputs segmentation mask + detection boxes in real time for the driving policy to consume.</div>
+        </div>
+      </div>
+      <div class="stage-row">
+        <div class="stage-badge pending">F</div>
+        <div>
+          <div class="stage-label">Driving policy · next phase</div>
+          <div class="stage-desc">Start with rule-based: PID controller against the road centerline + simple throttle/brake logic. An RL agent (PPO/SAC) is a later, much bigger project.</div>
+        </div>
+      </div>
+      <div class="stage-row">
+        <div class="stage-badge pending">G</div>
+        <div>
+          <div class="stage-label">Controller output · next phase</div>
+          <div class="stage-desc">vgamepad library creates a virtual Xbox controller. Forza sees it as real hardware. Steering / throttle / brake values come from the driving policy, sent at 60 Hz.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid grid-2" style="margin-bottom: 10px;">
+    <div class="panel">
+      <div class="section-label" style="margin-bottom: 10px;">Quick start</div>
+      <ol style="padding-left: 20px; font-size: 12px; line-height: 1.8;">
+        <li>Enable <strong>Data Out</strong> in Forza HUD settings, port <code class="inline">5300</code>, format <code class="inline">dash</code></li>
+        <li>Run <code class="inline">python -m backend.main</code> from the project root</li>
+        <li>Open <code class="inline">http://localhost:8000</code> in your browser</li>
+        <li>Record or ingest 2,000+ frames</li>
+        <li>Label 500 frames from the Label page</li>
+        <li>Run <code class="inline">python -m scripts.run_pipeline --round 1</code></li>
+        <li>Review the 50 uncertain frames on the Label page</li>
+        <li>Run round 2, round 3, etc. until mIoU plateaus</li>
+      </ol>
+    </div>
+
+    <div class="panel">
+      <div class="section-label" style="margin-bottom: 10px;">Troubleshooting</div>
+      <div class="troubleshoot-item">
+        <div class="q">Backend shows OFFLINE</div>
+        <div class="a">Make sure <code class="inline">python -m backend.main</code> is still running in a terminal. The sidebar dot polls <code class="inline">/api/system/health</code> every 3 seconds.</div>
+      </div>
+      <div class="troubleshoot-item">
+        <div class="q">No telemetry data</div>
+        <div class="a">Check Forza HUD settings. Data Out must be <strong>ON</strong>, port <strong>5300</strong>, format <strong>dash</strong>. Windows Firewall sometimes blocks the UDP packet — allow Python through.</div>
+      </div>
+      <div class="troubleshoot-item">
+        <div class="q">Training crashes with CUDA out of memory</div>
+        <div class="a">Drop batch size to 4 or 2 on the Train page config, or switch to a smaller backbone (edit <code class="inline">training/model.py</code>).</div>
+      </div>
+      <div class="troubleshoot-item">
+        <div class="q">YouTube download fails</div>
+        <div class="a">yt-dlp breaks often as YouTube changes. Update it: <code class="inline">pip install -U yt-dlp</code></div>
+      </div>
+      <div class="troubleshoot-item">
+        <div class="q">Pre-label button does nothing</div>
+        <div class="a">The pre-labeler needs torch + torchvision + ultralytics installed. First call is slow (downloads the pretrained weights). Check the backend terminal for errors.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-label" style="margin-bottom: 10px;">Reference</div>
+    <div class="grid grid-2">
+      <a class="ref-tile" href="https://github.com/your-org/forzatek#readme" target="_blank" rel="noopener">
+        <div>
+          <div style="font-size: 12px; font-weight: 500;">README</div>
+          <div style="font-size: 11px; color: var(--ink-dim); margin-top: 2px;">Full setup &amp; architecture</div>
+        </div>
+        <span class="nums" style="color: var(--ink-faint);">→</span>
+      </a>
+      <a class="ref-tile" href="#" onclick="alert('See backend/database.py for the schema.'); return false;">
+        <div>
+          <div style="font-size: 12px; font-weight: 500;">Database schema</div>
+          <div style="font-size: 11px; color: var(--ink-dim); margin-top: 2px;">Frames, labels, proposals, models</div>
+        </div>
+        <span class="nums" style="color: var(--ink-faint);">→</span>
+      </a>
+      <a class="ref-tile" href="https://support.forzamotorsport.net/hc/en-us/articles/21742298322451-Forza-Motorsport-Data-Out-Documentation" target="_blank" rel="noopener">
+        <div>
+          <div style="font-size: 12px; font-weight: 500;">Forza UDP format</div>
+          <div style="font-size: 11px; color: var(--ink-dim); margin-top: 2px;">Packet layout · dash format</div>
+        </div>
+        <span class="nums" style="color: var(--ink-faint);">→</span>
+      </a>
+      <a class="ref-tile" href="https://github.com/your-org/forzatek/issues" target="_blank" rel="noopener">
+        <div>
+          <div style="font-size: 12px; font-weight: 500;">Report an issue</div>
+          <div style="font-size: 11px; color: var(--ink-dim); margin-top: 2px;">GitHub issues</div>
+        </div>
+        <span class="nums" style="color: var(--ink-faint);">→</span>
+      </a>
+    </div>
+  </section>
+
+</main>
+
+<script>
+ForzaTek.mount('help');
+</script>
+</body>
+</html>

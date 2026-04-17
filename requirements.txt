@@ -1,0 +1,25 @@
+# ForzaTek AI — Python dependencies
+# Tested on Python 3.10 / 3.11
+
+# Web backend
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.9
+
+# Image & video
+opencv-python>=4.9.0
+numpy>=1.24.0
+Pillow>=10.0.0
+
+# ML stack (install with CUDA-matching torch build separately if needed)
+# For CUDA 12.x:
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+torch>=2.1.0
+torchvision>=0.16.0
+timm>=0.9.12
+
+# Object detection (YOLOv8 for pre-labeling)
+ultralytics>=8.1.0
+
+# Video ingestion
+yt-dlp>=2024.3.10

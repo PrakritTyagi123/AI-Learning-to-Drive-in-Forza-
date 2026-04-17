@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ForzaTek — Label</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js"></script>
+<style>
+  body { overflow: hidden; }
+  .label-layout {
+    height: calc(100vh);
+    display: grid;
+    grid-template-rows: auto 1fr;
+  }
+  .label-bar {
+    border-bottom: 1px solid var(--edge);
+    background: var(--surface);
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .label-main {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr) 240px;
+    min-height: 0;
+  }
+  .side {
+    background: var(--surface);
+    overflow-y: auto;
+  }
+  .side.left  { border-right: 1px solid var(--edge); }
+  .side.right { border-left:  1px solid var(--edge); }
+  .side-section { padding: 12px 14px; border-bottom: 1px solid var(--edge); }
+
+  .cls-row {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 8px;
+    border: 1px solid var(--edge);
+    border-radius: 2px;
+    margin-bottom: 3px;
+    cursor: pointer;
+    background: transparent;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .cls-row:hover { border-color: var(--edge-hot); }
+  .cls-row.active { border-color: var(--accent); background: var(--surface-2); }
+  .cls-row .sw { width: 12px; height: 12px; border-radius: 2px; }
+
+  .stage {
+    background: #080a0d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .stage canvas { display: block; image-rendering: pixelated; }
+  .stage svg.boxes { position: absolute; top: 0; left: 0; pointer-events: none; width: 100%; height: 100%; }
+  .bbox { fill: rgba(107,143,175,0.1); stroke: var(--accent); stroke-width: 2; pointer-events: all; cursor: pointer; }
+  .bbox.sign { stroke: var(--warn); fill: rgba(212,165,86,0.1); }
+  .bbox.selected { stroke: var(--danger); stroke-width: 3; fill: rgba(192,96,96,0.15); }
+  .bbox-label { font: 600 10px 'JetBrains Mono'; fill: var(--ink); }
+  .empty-state { color: var(--ink-dim); font-size: 13px; letter-spacing: 0.08em; text-align: center; padding: 40px; }
+</style>
+</head>
+<body>
+
+<div class="label-layout">
+
+  <div class="label-bar">
+    <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+      <div>
+        <div class="crumb" style="font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.14em; color: var(--ink-faint); text-transform: uppercase;">Data / label</div>
+        <div style="font-size: 13px; font-weight: 500; letter-spacing: 0.02em;">Annotation workbench</div>
+      </div>
+      <span class="pill pill-accent" id="modePill">MODE · SEG</span>
+      <span class="pill" id="frameIdPill">FRAME —</span>
+      <span class="pill pill-warn" id="reviewPill" style="display: none;">REVIEW</span>
+    </div>
+    <div style="display: flex; gap: 6px;">
+      <span class="pill pill-ok" id="labeledPill">0 LABELED</span>
+      <span class="pill pill-warn" id="queuePill">0 IN QUEUE</span>
+    </div>
+  </div>
+
+  <div class="label-main">
+
+    <!-- LEFT PALETTE -->
+    <div class="side left">
+      <div class="side-section">
+        <div class="section-label" style="margin-bottom: 8px;">Mode</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+          <button class="btn btn-sm" id="modeSeg">SEG</button>
+          <button class="btn btn-sm" id="modeDet">DET</button>
+        </div>
+      </div>
+
+      <div class="side-section" id="segPanel">
+        <div class="section-label" style="margin-bottom: 8px;">Segmentation class</div>
+        <div class="cls-row active" data-cls="1">
+          <div class="sw" style="background: #6b8faf;"></div>
+          <span style="font-size: 12px;">Road</span>
+          <span class="nums" style="font-size: 10px; color: var(--ink-faint);">1</span>
+        </div>
+        <div class="cls-row" data-cls="2">
+          <div class="sw" style="background: #d4a556;"></div>
+          <span style="font-size: 12px;">Curb</span>
+          <span class="nums" style="font-size: 10px; color: var(--ink-faint);">2</span>
+        </div>
+        <div class="cls-row" data-cls="3">
+          <div class="sw" style="background: #c06060;"></div>
+          <span style="font-size: 12px;">Wall</span>
+          <span class="nums" style="font-size: 10px; color: var(--ink-faint);">3</span>
+        </div>
+        <div class="cls-row" data-cls="0">
+          <div class="sw" style="background: #5c4b3a;"></div>
+          <span style="font-size: 12px;">Offroad</span>
+          <span class="nums" style="font-size: 10px; color: var(--ink-faint);">0</span>
+        </div>
+
+        <div style="margin-top: 12px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span class="section-label" style="font-size: 9px;">Brush</span>
+            <span class="nums" style="font-size: 10px;" id="brushVal">25</span>
+          </div>
+          <input type="range" id="brushSize" min="5" max="80" value="25">
+        </div>
+      </div>
+
+      <div class="side-section" id="detPanel" style="display: none;">
+        <div class="section-label" style="margin-bottom: 8px;">Detection class</div>
+        <div class="cls-row active" data-detcls="vehicle">
+          <div class="sw" style="background: #6b8faf;"></div>
+          <span style="font-size: 12px;">Vehicle</span>
+          <span class="nums" style="font-size: 10px; color: var(--ink-faint);">V</span>
+        </div>
+        <div class="cls-row" data-detcls="sign">
+          <div class="sw" style="background: #d4a556;"></div>
+          <span style="font-size: 12px;">Sign</span>
+          <span class="nums" style="font-size: 10px; color: var(--ink-faint);">N</span>
+        </div>
+        <button class="btn btn-danger btn-sm btn-block" id="delBoxBtn" style="margin-top: 10px;">DELETE SELECTED</button>
+      </div>
+
+      <div class="side-section">
+        <div class="section-label" style="margin-bottom: 8px;">Hotkeys</div>
+        <div style="display: flex; flex-direction: column; gap: 3px; font-size: 11px;">
+          <div style="display: flex; justify-content: space-between;"><span style="color: var(--ink-dim);">Save</span><kbd>SPC</kbd></div>
+          <div style="display: flex; justify-content: space-between;"><span style="color: var(--ink-dim);">Skip</span><kbd>S</kbd></div>
+          <div style="display: flex; justify-content: space-between;"><span style="color: var(--ink-dim);">Accept</span><kbd>A</kbd></div>
+          <div style="display: flex; justify-content: space-between;"><span style="color: var(--ink-dim);">Reject</span><kbd>R</kbd></div>
+          <div style="display: flex; justify-content: space-between;"><span style="color: var(--ink-dim);">Pre-label</span><kbd>P</kbd></div>
+          <div style="display: flex; justify-content: space-between;"><span style="color: var(--ink-dim);">Toggle mode</span><kbd>TAB</kbd></div>
+          <div style="display: flex; justify-content: space-between;"><span style="color: var(--ink-dim);">Undo</span><kbd>⌃Z</kbd></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER STAGE -->
+    <div class="stage" id="stage">
+      <div class="empty-state" id="emptyState">LOADING FRAME…</div>
+      <div id="canvasWrap" style="display: none; position: relative;">
+        <canvas id="imgCanvas"></canvas>
+        <canvas id="segCanvas" style="position: absolute; top: 0; left: 0; opacity: 0.5;"></canvas>
+        <svg class="boxes" id="boxSvg"></svg>
+      </div>
+    </div>
+
+    <!-- RIGHT INFO -->
+    <div class="side right">
+      <div class="side-section">
+        <div class="section-label" style="margin-bottom: 8px;">Progress</div>
+        <div class="kv"><span class="k">Labeled</span><span class="v ok" id="pLabeled">0</span></div>
+        <div class="kv"><span class="k">Proposed</span><span class="v warn" id="pProposed">0</span></div>
+        <div class="kv"><span class="k">Unlabeled</span><span class="v dim" id="pUnlabeled">0</span></div>
+        <div class="progress ok" style="margin-top: 8px;"><div id="pBar" style="width: 0%"></div></div>
+      </div>
+
+      <div id="reviewBanner" style="display: none; padding: 10px 14px; background: var(--warn-bg); border-bottom: 1px solid var(--warn); color: var(--warn); font-size: 11px; line-height: 1.5;">
+        Model proposed these labels. <kbd>A</kbd> accept · <kbd>R</kbd> clear & redo
+      </div>
+
+      <div class="side-section">
+        <div class="section-label" style="margin-bottom: 8px;">Frame info</div>
+        <div class="kv"><span class="k">ID</span><span class="v" id="iId">—</span></div>
+        <div class="kv"><span class="k">Source</span><span class="v" id="iSource">—</span></div>
+        <div class="kv"><span class="k">Game</span><span class="v" id="iGame">—</span></div>
+        <div class="kv"><span class="k">Biome</span><span class="v" id="iBiome">—</span></div>
+        <div class="kv"><span class="k">Weather</span><span class="v" id="iWeather">—</span></div>
+        <div class="kv"><span class="k">Time</span><span class="v" id="iTod">—</span></div>
+      </div>
+
+      <div class="side-section" id="confPanel" style="display: none;">
+        <div class="section-label" style="margin-bottom: 8px;">Model confidence</div>
+        <div class="kv"><span class="k">Uncertainty</span><span class="v warn" id="cUnc">—</span></div>
+        <div class="kv"><span class="k">Seg conf</span><span class="v" id="cSeg">—</span></div>
+        <div class="kv"><span class="k">Det conf</span><span class="v" id="cDet">—</span></div>
+        <div class="kv"><span class="k">Lowest box</span><span class="v" id="cLow">—</span></div>
+      </div>
+
+      <div class="side-section">
+        <button class="btn btn-ok btn-block" id="submitBtn">SAVE & NEXT</button>
+        <button class="btn btn-block" id="skipBtn" style="margin-top: 6px;">SKIP</button>
+        <button class="btn btn-accent btn-block" id="prelabelBtn" style="margin-top: 6px;">PRE-LABEL</button>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+ForzaTek.mount('label');
+const { api, fmt, confClass } = ForzaTek;
+
+const state = {
+  frameId: null, origW: 0, origH: 0, dispW: 0, dispH: 0,
+  mode: 'seg', segClass: 1, detClass: 'vehicle', brushSize: 25,
+  painting: false, drawingBox: null, boxes: [], selectedBox: -1,
+  proposals: null, existingLabels: null, undoStack: [], isReview: false,
+};
+const CLASS_COLORS = { 0: [92,75,58], 1: [107,143,175], 2: [212,165,86], 3: [192,96,96] };
+
+const imgCanvas = document.getElementById('imgCanvas');
+const segCanvas = document.getElementById('segCanvas');
+const boxSvg = document.getElementById('boxSvg');
+const imgCtx = imgCanvas.getContext('2d');
+const segCtx = segCanvas.getContext('2d');
+
+function fit(w, h) {
+  const s = document.getElementById('stage');
+  const sx = (s.clientWidth - 40) / w;
+  const sy = (s.clientHeight - 40) / h;
+  const sc = Math.min(sx, sy, 1.5);
+  state.dispW = Math.floor(w * sc); state.dispH = Math.floor(h * sc);
+  imgCanvas.width = state.dispW; imgCanvas.height = state.dispH;
+  segCanvas.width = state.dispW; segCanvas.height = state.dispH;
+  segCtx.clearRect(0, 0, state.dispW, state.dispH);
+  document.getElementById('canvasWrap').style.width = state.dispW + 'px';
+  document.getElementById('canvasWrap').style.height = state.dispH + 'px';
+}
+
+async function loadNext() {
+  document.getElementById('emptyState').style.display = 'block';
+  document.getElementById('canvasWrap').style.display = 'none';
+  try {
+    const res = await api.get('/api/label/next');
+    if (!res.frame_id) {
+      document.getElementById('emptyState').textContent = 'NO UNLABELED FRAMES — RECORD OR INGEST MORE DATA';
+      return;
+    }
+    await loadFrame(res.frame_id, res.frame, res.labels, res.proposals);
+  } catch (e) {
+    document.getElementById('emptyState').textContent = 'LOAD FAILED: ' + e.message;
+  }
+}
+
+async function loadFrame(id, fr, labels, proposals) {
+  state.frameId = id;
+  state.origW = fr.width; state.origH = fr.height;
+  state.proposals = proposals || {};
+  state.existingLabels = labels || {};
+  state.undoStack = []; state.boxes = []; state.selectedBox = -1;
+  state.isReview = Object.keys(state.proposals).length > 0 && Object.keys(state.existingLabels).length === 0;
+
+  document.getElementById('iId').textContent = id;
+  document.getElementById('iSource').textContent = fr.source_type;
+  document.getElementById('iGame').textContent = (fr.game_version || '—').toUpperCase();
+  document.getElementById('iBiome').textContent = fr.biome || '—';
+  document.getElementById('iWeather').textContent = fr.weather || '—';
+  document.getElementById('iTod').textContent = fr.time_of_day || '—';
+  document.getElementById('frameIdPill').textContent = 'FRAME #' + id;
+  document.getElementById('reviewBanner').style.display = state.isReview ? 'block' : 'none';
+  document.getElementById('reviewPill').style.display = state.isReview ? '' : 'none';
+
+  // Confidence panel
+  const cp = document.getElementById('confPanel');
+  if (state.isReview) {
+    cp.style.display = 'block';
+    const detProp = state.proposals.det;
+    const segProp = state.proposals.seg;
+    const unc = Math.max(detProp?.uncertainty || 0, segProp?.uncertainty || 0);
+    const segConf = segProp?.confidence;
+    const boxes = detProp?.data?.boxes || [];
+    const detConfs = boxes.map(b => b.confidence).filter(c => c != null);
+    const detMean = detConfs.length ? detConfs.reduce((a,b)=>a+b,0) / detConfs.length : null;
+    const detLow  = detConfs.length ? Math.min(...detConfs) : null;
+
+    document.getElementById('cUnc').textContent = unc != null ? unc.toFixed(3) : '—';
+    document.getElementById('cSeg').textContent = segConf != null ? segConf.toFixed(3) : '—';
+    const cDet = document.getElementById('cDet');
+    const cLow = document.getElementById('cLow');
+    cDet.textContent = detMean != null ? detMean.toFixed(3) : '—';
+    cDet.className = 'v ' + (detMean != null ? confClass(detMean) : '');
+    cLow.textContent = detLow != null ? detLow.toFixed(3) : '—';
+    cLow.className = 'v ' + (detLow != null ? confClass(detLow) : '');
+  } else {
+    cp.style.display = 'none';
+  }
+
+  const img = new Image();
+  img.onload = () => {
+    fit(state.origW, state.origH);
+    imgCtx.drawImage(img, 0, 0, state.dispW, state.dispH);
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('canvasWrap').style.display = 'block';
+
+    const segSrc = state.existingLabels.seg?.data || state.proposals.seg?.data;
+    const detSrc = state.existingLabels.det?.data || state.proposals.det?.data;
+    if (segSrc?.mask_png_b64) loadSeg(segSrc.mask_png_b64);
+    if (detSrc?.boxes) { state.boxes = detSrc.boxes.map(b => ({ ...b })); renderBoxes(); }
+  };
+  img.src = '/api/label/frame/' + id + '/image';
+}
+
+function loadSeg(b64) {
+  const img = new Image();
+  img.onload = () => {
+    const off = document.createElement('canvas');
+    off.width = state.origW; off.height = state.origH;
+    const octx = off.getContext('2d');
+    octx.drawImage(img, 0, 0, state.origW, state.origH);
+    const d = octx.getImageData(0, 0, state.origW, state.origH);
+    for (let i = 0; i < d.data.length; i += 4) {
+      const c = d.data[i];
+      const col = CLASS_COLORS[c] || [0,0,0];
+      d.data[i] = col[0]; d.data[i+1] = col[1]; d.data[i+2] = col[2];
+      d.data[i+3] = (c >= 0 && c <= 3) ? 255 : 0;
+    }
+    octx.putImageData(d, 0, 0);
+    segCtx.clearRect(0, 0, state.dispW, state.dispH);
+    segCtx.drawImage(off, 0, 0, state.dispW, state.dispH);
+  };
+  img.src = 'data:image/png;base64,' + b64;
+}
+
+function pushUndo() {
+  state.undoStack.push(segCtx.getImageData(0, 0, state.dispW, state.dispH));
+  if (state.undoStack.length > 30) state.undoStack.shift();
+}
+function undo() { if (state.undoStack.length) segCtx.putImageData(state.undoStack.pop(), 0, 0); }
+function paint(x, y, cls) {
+  const [r,g,b] = CLASS_COLORS[cls];
+  segCtx.fillStyle = `rgba(${r},${g},${b},1)`;
+  segCtx.beginPath();
+  segCtx.arc(x, y, state.brushSize/2, 0, Math.PI*2);
+  segCtx.fill();
+}
+
+segCanvas.addEventListener('mousedown', e => {
+  if (state.frameId === null) return;
+  const r = segCanvas.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  if (state.mode === 'seg') { pushUndo(); state.painting = true; paint(x, y, state.segClass); }
+  else {
+    const nx = x/state.dispW, ny = y/state.dispH;
+    let hit = -1;
+    state.boxes.forEach((b, i) => { if (nx>=b.x && nx<=b.x+b.w && ny>=b.y && ny<=b.y+b.h) hit = i; });
+    if (hit >= 0) { state.selectedBox = hit; renderBoxes(); }
+    else { state.selectedBox = -1; state.drawingBox = { x: nx, y: ny, w: 0, h: 0, cls: state.detClass }; }
+  }
+});
+segCanvas.addEventListener('mousemove', e => {
+  if (state.frameId === null) return;
+  const r = segCanvas.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  if (state.mode === 'seg' && state.painting) paint(x, y, state.segClass);
+  else if (state.drawingBox) {
+    state.drawingBox.w = x/state.dispW - state.drawingBox.x;
+    state.drawingBox.h = y/state.dispH - state.drawingBox.y;
+    renderBoxes(state.drawingBox);
+  }
+});
+window.addEventListener('mouseup', () => {
+  state.painting = false;
+  if (state.drawingBox) {
+    const b = state.drawingBox;
+    const box = { cls: b.cls, x: Math.min(b.x, b.x+b.w), y: Math.min(b.y, b.y+b.h), w: Math.abs(b.w), h: Math.abs(b.h) };
+    if (box.w > 0.005 && box.h > 0.005) state.boxes.push(box);
+    state.drawingBox = null;
+    renderBoxes();
+  }
+});
+
+function renderBoxes(preview) {
+  boxSvg.setAttribute('viewBox', `0 0 ${state.dispW} ${state.dispH}`);
+  let html = '';
+  const draw = (b, i, pv) => {
+    const x = Math.min(b.x, b.x+b.w) * state.dispW;
+    const y = Math.min(b.y, b.y+b.h) * state.dispH;
+    const w = Math.abs(b.w) * state.dispW;
+    const h = Math.abs(b.h) * state.dispH;
+    const cls = b.cls === 'sign' ? 'sign' : '';
+    const sel = i === state.selectedBox ? 'selected' : '';
+    const confTxt = b.confidence != null ? ' ' + b.confidence.toFixed(2) : '';
+    html += `<rect class="bbox ${cls} ${sel}" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
+    html += `<text class="bbox-label" x="${x+4}" y="${y+12}">${b.cls.toUpperCase()}${confTxt}</text>`;
+  };
+  state.boxes.forEach((b, i) => draw(b, i));
+  if (preview) draw(preview, -99, true);
+  boxSvg.innerHTML = html;
+}
+
+function setMode(m) {
+  state.mode = m;
+  document.getElementById('segPanel').style.display = m === 'seg' ? 'block' : 'none';
+  document.getElementById('detPanel').style.display = m === 'det' ? 'block' : 'none';
+  document.getElementById('modePill').textContent = 'MODE · ' + m.toUpperCase();
+  document.getElementById('modeSeg').className = m === 'seg' ? 'btn btn-sm btn-accent' : 'btn btn-sm';
+  document.getElementById('modeDet').className = m === 'det' ? 'btn btn-sm btn-accent' : 'btn btn-sm';
+}
+setMode('seg');
+document.getElementById('modeSeg').onclick = () => setMode('seg');
+document.getElementById('modeDet').onclick = () => setMode('det');
+
+document.querySelectorAll('.cls-row[data-cls]').forEach(el => el.addEventListener('click', () => {
+  state.segClass = parseInt(el.dataset.cls);
+  document.querySelectorAll('.cls-row[data-cls]').forEach(x => x.classList.toggle('active', parseInt(x.dataset.cls) === state.segClass));
+}));
+document.querySelectorAll('.cls-row[data-detcls]').forEach(el => el.addEventListener('click', () => {
+  state.detClass = el.dataset.detcls;
+  document.querySelectorAll('.cls-row[data-detcls]').forEach(x => x.classList.toggle('active', x.dataset.detcls === state.detClass));
+}));
+
+document.getElementById('brushSize').addEventListener('input', e => {
+  state.brushSize = parseInt(e.target.value);
+  document.getElementById('brushVal').textContent = state.brushSize;
+});
+document.getElementById('delBoxBtn').onclick = () => {
+  if (state.selectedBox >= 0) { state.boxes.splice(state.selectedBox, 1); state.selectedBox = -1; renderBoxes(); }
+};
+
+function extractSeg() {
+  const off = document.createElement('canvas');
+  off.width = state.origW; off.height = state.origH;
+  const octx = off.getContext('2d');
+  octx.drawImage(segCanvas, 0, 0, state.origW, state.origH);
+  const d = octx.getImageData(0, 0, state.origW, state.origH);
+  const out = octx.createImageData(state.origW, state.origH);
+  const colors = Object.entries(CLASS_COLORS);
+  for (let i = 0; i < d.data.length; i += 4) {
+    if (d.data[i+3] < 10) { out.data[i]=255; out.data[i+1]=255; out.data[i+2]=255; out.data[i+3]=255; continue; }
+    let best = 0, bd = Infinity;
+    for (const [k, c] of colors) {
+      const dist = (d.data[i]-c[0])**2 + (d.data[i+1]-c[1])**2 + (d.data[i+2]-c[2])**2;
+      if (dist < bd) { bd = dist; best = parseInt(k); }
+    }
+    out.data[i] = best; out.data[i+1] = best; out.data[i+2] = best; out.data[i+3] = 255;
+  }
+  octx.putImageData(out, 0, 0);
+  return off.toDataURL('image/png').split(',')[1];
+}
+
+async function submit(overrideProv) {
+  if (state.frameId === null) return;
+  const segB64 = extractSeg();
+  const hadSP = !!state.proposals.seg, hadDP = !!state.proposals.det;
+  const provSeg = overrideProv || (hadSP ? 'proposed_edited' : 'manual');
+  const provDet = overrideProv || (hadDP ? 'proposed_edited' : 'manual');
+  await api.post('/api/label/submit', {
+    frame_id: state.frameId, round_num: 1,
+    labels: {
+      seg: { data: { mask_png_b64: segB64, classes: ['offroad','road','curb','wall'] }, provenance: provSeg },
+      det: { data: { boxes: state.boxes }, provenance: provDet },
+    },
+  });
+  await loadNext(); refreshProgress();
+}
+async function skip() {
+  if (state.frameId === null) return;
+  await api.post('/api/label/skip', { frame_id: state.frameId });
+  await loadNext(); refreshProgress();
+}
+async function prelabel() {
+  if (state.frameId === null) return;
+  document.getElementById('prelabelBtn').disabled = true;
+  document.getElementById('prelabelBtn').textContent = 'PRE-LABELING…';
+  try {
+    const r = await api.get('/api/label/prelabel/' + state.frameId);
+    if (r.seg?.mask_png_b64) loadSeg(r.seg.mask_png_b64);
+    if (r.det?.boxes) { state.boxes = r.det.boxes.map(b => ({ ...b })); renderBoxes(); }
+  } catch (e) { alert('Pre-label failed: ' + e.message); }
+  document.getElementById('prelabelBtn').disabled = false;
+  document.getElementById('prelabelBtn').textContent = 'PRE-LABEL';
+}
+
+document.getElementById('submitBtn').onclick = () => submit();
+document.getElementById('skipBtn').onclick = skip;
+document.getElementById('prelabelBtn').onclick = prelabel;
+
+window.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+  const k = e.key.toLowerCase();
+  if (k === ' ') { e.preventDefault(); submit(); }
+  else if (k === 's') skip();
+  else if (k === 'a' && state.isReview) submit('proposed_accepted');
+  else if (k === 'r' && state.isReview) { segCtx.clearRect(0,0,state.dispW,state.dispH); state.boxes = []; renderBoxes(); }
+  else if (k === 'p') prelabel();
+  else if (k === 'tab') { e.preventDefault(); setMode(state.mode === 'seg' ? 'det' : 'seg'); }
+  else if (['0','1','2','3'].includes(k)) {
+    state.segClass = parseInt(k);
+    document.querySelectorAll('.cls-row[data-cls]').forEach(x => x.classList.toggle('active', parseInt(x.dataset.cls) === state.segClass));
+  }
+});
+
+async function refreshProgress() {
+  try {
+    const p = await api.get('/api/label/progress');
+    document.getElementById('pLabeled').textContent = p.labeled;
+    document.getElementById('pProposed').textContent = p.proposed;
+    document.getElementById('pUnlabeled').textContent = p.unlabeled;
+    document.getElementById('labeledPill').textContent = p.labeled + ' LABELED';
+    document.getElementById('queuePill').textContent = p.queue + ' IN QUEUE';
+    document.getElementById('pBar').style.width = Math.round(100 * p.labeled / (p.total || 1)) + '%';
+  } catch (e) {}
+}
+refreshProgress(); loadNext();
+setInterval(refreshProgress, 4000);
+
+window.addEventListener('resize', () => {
+  if (state.frameId !== null) {
+    fit(state.origW, state.origH);
+    const img = new Image();
+    img.onload = () => imgCtx.drawImage(img, 0, 0, state.dispW, state.dispH);
+    img.src = '/api/label/frame/' + state.frameId + '/image';
+  }
+});
+</script>
+</body>
+</html>

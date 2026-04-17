@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ForzaTek — Record</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js"></script>
+</head>
+<body>
+
+<main class="page">
+
+  <header class="page-header">
+    <div>
+      <div class="crumb">Data / record</div>
+      <h1>Live frame capture</h1>
+    </div>
+    <div class="pills">
+      <span class="pill" id="recStatus">IDLE</span>
+      <span class="pill nums" id="elapsedPill">00:00</span>
+    </div>
+  </header>
+
+  <section class="panel" style="margin-bottom: 10px;">
+    <div class="section-label" style="margin-bottom: 12px;">Session configuration</div>
+    <div class="grid grid-4" style="margin-bottom: 12px;">
+      <div class="field">
+        <label>Game version</label>
+        <select class="select" id="gameVer">
+          <option value="fh4">Forza Horizon 4</option>
+          <option value="fh5">Forza Horizon 5</option>
+          <option value="fh6">Forza Horizon 6</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Biome override</label>
+        <select class="select" id="biome">
+          <option value="">Auto-detect</option>
+          <option>city</option><option>coast</option><option>countryside</option>
+          <option>forest</option><option>mountain</option><option>desert</option>
+          <option>jungle</option><option>snow</option><option>highway</option><option>dirt</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Telemetry UDP port</label>
+        <input type="text" class="input" id="udpPort" value="5300">
+      </div>
+      <div class="field">
+        <label>Sample interval</label>
+        <select class="select" id="interval">
+          <option value="0.25">0.25 s (auto-dedup)</option>
+          <option value="0.5">0.5 s</option>
+          <option value="1.0">1.0 s</option>
+        </select>
+      </div>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn btn-ok" id="btnStart" style="flex: 1;">START RECORDING</button>
+      <button class="btn btn-danger" id="btnStop" style="flex: 1;" disabled>STOP</button>
+    </div>
+  </section>
+
+  <section class="grid grid-4" style="margin-bottom: 10px;">
+    <div class="stat">
+      <div class="stat-label">Saved</div>
+      <div class="stat-value ok" id="sSaved">0</div>
+      <div class="stat-sub">frames this session</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Disk used</div>
+      <div class="stat-value" id="sDisk">0</div>
+      <div class="stat-sub" id="sDiskSub">MB · avg 0 KB/frame</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Skipped (dedup)</div>
+      <div class="stat-value dim" id="sDedup">0</div>
+      <div class="stat-sub">pHash match · similar frames</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Buckets filled</div>
+      <div class="stat-value warn" id="bFilled">0</div>
+      <div class="stat-sub" id="bTotal">of 1 at target</div>
+      <div class="stat-bar warn"><div id="bBar" style="width: 0%"></div></div>
+    </div>
+  </section>
+
+  <section class="panel" style="margin-bottom: 10px;">
+    <div class="section-label" style="margin-bottom: 12px;">Live telemetry</div>
+    <div class="grid grid-3" style="gap: 0; border-top: 1px solid var(--edge); border-bottom: 1px solid var(--edge); margin-bottom: 0;">
+      <div style="padding: 10px; border-right: 1px solid var(--edge);">
+        <div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Speed</div>
+        <div style="display: flex; align-items: baseline; gap: 4px;">
+          <div class="nums" style="font-size: 20px; font-weight: 500;" id="tSpeed">—</div>
+          <div class="nums" style="font-size: 10px; color: var(--ink-faint);">MPH</div>
+        </div>
+      </div>
+      <div style="padding: 10px; border-right: 1px solid var(--edge);">
+        <div class="section-label" style="font-size: 9px; margin-bottom: 2px;">RPM</div>
+        <div class="nums" style="font-size: 20px; font-weight: 500;" id="tRpm">—</div>
+      </div>
+      <div style="padding: 10px;">
+        <div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Gear</div>
+        <div class="nums" style="font-size: 20px; font-weight: 500;" id="tGear">—</div>
+      </div>
+    </div>
+    <div class="grid grid-3" style="gap: 0;">
+      <div style="padding: 10px; border-right: 1px solid var(--edge);">
+        <div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Throttle</div>
+        <div class="nums" style="font-size: 20px; font-weight: 500; color: var(--ok);" id="tThrottle">—</div>
+      </div>
+      <div style="padding: 10px; border-right: 1px solid var(--edge);">
+        <div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Brake</div>
+        <div class="nums" style="font-size: 20px; font-weight: 500; color: var(--danger);" id="tBrake">—</div>
+      </div>
+      <div style="padding: 10px;">
+        <div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Steer</div>
+        <div class="nums" style="font-size: 20px; font-weight: 500;" id="tSteer">—</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <div class="section-label">Bucket priorities</div>
+      <span class="nums" style="font-size: 10px; color: var(--ink-faint);">game × biome × weather × time</span>
+    </div>
+    <div id="bucketList" style="display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto;">
+      <div style="text-align: center; color: var(--ink-faint); font-size: 12px; padding: 24px; font-style: italic;">
+        Start a recording session to populate buckets.
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+ForzaTek.mount('record');
+const { api, fmt } = ForzaTek;
+
+let recording = false;
+
+async function refresh() {
+  try {
+    const s = await api.get('/api/record/stats');
+    recording = !!s.recording;
+
+    document.getElementById('recStatus').textContent = recording ? '● RECORDING' : 'IDLE';
+    document.getElementById('recStatus').className = 'pill ' + (recording ? 'pill-danger' : '');
+    document.getElementById('elapsedPill').textContent = fmt.sec(s.elapsed_sec || 0);
+
+    document.getElementById('btnStart').disabled = recording;
+    document.getElementById('btnStop').disabled = !recording;
+
+    document.getElementById('sSaved').textContent = fmt.n(s.frames_saved || 0);
+    document.getElementById('sDisk').textContent = fmt.n(s.disk_mb || 0, 1);
+    const avg = s.frames_saved ? (s.disk_mb * 1024 / s.frames_saved) : 0;
+    document.getElementById('sDiskSub').textContent = `MB · avg ${Math.round(avg)} KB/frame`;
+    document.getElementById('sDedup').textContent = fmt.n(s.frames_skipped_dedup || 0);
+    document.getElementById('bFilled').textContent = s.buckets_at_target || 0;
+    document.getElementById('bTotal').textContent = `of ${s.total_buckets || 1} at target`;
+    document.getElementById('bBar').style.width = Math.round(100 * (s.buckets_at_target || 0) / (s.total_buckets || 1)) + '%';
+
+    // Live telemetry
+    try {
+      const t = await api.get('/api/telemetry/live');
+      if (t && t.speed != null) {
+        document.getElementById('tSpeed').textContent = fmt.n(t.speed);
+        document.getElementById('tRpm').textContent = fmt.n(t.rpm);
+        document.getElementById('tGear').textContent = t.gear ?? '—';
+        document.getElementById('tThrottle').textContent = (t.throttle != null) ? t.throttle.toFixed(2) : '—';
+        document.getElementById('tBrake').textContent = (t.brake != null) ? t.brake.toFixed(2) : '—';
+        document.getElementById('tSteer').textContent = (t.steer != null) ? (t.steer >= 0 ? '+' : '') + t.steer.toFixed(2) : '—';
+      }
+    } catch {}
+
+    // Buckets
+    try {
+      const br = await api.get('/api/record/buckets');
+      const buckets = br.buckets || [];
+      const list = document.getElementById('bucketList');
+      if (!buckets.length) {
+        list.innerHTML = '<div style="text-align: center; color: var(--ink-faint); font-size: 12px; padding: 24px; font-style: italic;">No buckets yet. Start recording.</div>';
+      } else {
+        list.innerHTML = buckets.slice(0, 30).map(b => {
+          const pct = Math.min(100, Math.round(100 * b.count / b.target));
+          let cls = 'danger';
+          if (b.count >= b.target) cls = 'ok';
+          else if (pct >= 40) cls = 'warn';
+          return `
+            <div>
+              <div style="display: flex; justify-content: space-between; gap: 8px; margin-bottom: 3px;">
+                <span class="truncate nums" style="font-size: 11px; color: var(--ink-dim); min-width: 0;">${b.game_version}·${b.biome}·${b.weather}·${b.time_of_day}</span>
+                <span class="nums" style="font-size: 11px; color: var(--${cls}); flex-shrink: 0;">${b.count} / ${b.target}</span>
+              </div>
+              <div class="progress ${cls}"><div style="width: ${pct}%"></div></div>
+            </div>
+          `;
+        }).join('');
+      }
+    } catch {}
+  } catch (e) {}
+}
+
+document.getElementById('btnStart').addEventListener('click', async () => {
+  try {
+    await api.post('/api/record/start', {
+      game_version: document.getElementById('gameVer').value,
+      biome_override: document.getElementById('biome').value || null,
+    });
+    refresh();
+  } catch (e) { alert('Start failed: ' + e.message); }
+});
+document.getElementById('btnStop').addEventListener('click', async () => {
+  try { await api.post('/api/record/stop'); refresh(); } catch (e) {}
+});
+
+setInterval(refresh, 1000); refresh();
+</script>
+</body>
+</html>

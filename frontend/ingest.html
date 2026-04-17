@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ForzaTek — Ingest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js"></script>
+<style>
+  .hud-editor { position: relative; background: var(--bg); border: 1px solid var(--edge); line-height: 0; }
+  .hud-editor img { display: block; width: 100%; user-select: none; }
+  .hud-editor .rect {
+    position: absolute;
+    border: 2px solid var(--danger);
+    background: rgba(192, 96, 96, 0.22);
+    pointer-events: all;
+  }
+  .hud-editor .rect .close {
+    position: absolute; top: -10px; right: -10px;
+    width: 18px; height: 18px;
+    background: var(--danger);
+    color: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 11px;
+    border-radius: 2px;
+  }
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 100;
+    overflow: auto;
+    padding: 40px 20px;
+  }
+</style>
+</head>
+<body>
+
+<main class="page">
+
+  <header class="page-header">
+    <div>
+      <div class="crumb">Data / ingest</div>
+      <h1>Video ingestion</h1>
+    </div>
+    <div class="pills">
+      <span class="pill" id="sourcesCount">0 SOURCES</span>
+      <span class="pill" id="jobPill" style="display: none;"></span>
+    </div>
+  </header>
+
+  <section class="panel" style="margin-bottom: 10px;">
+    <div class="section-label" style="margin-bottom: 12px;">Add source</div>
+
+    <div style="display: flex; gap: 0; margin-bottom: 12px;">
+      <button class="btn btn-accent" id="tabYT" style="flex: 1; border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: none;">YOUTUBE URL</button>
+      <button class="btn" id="tabFile" style="flex: 1; border-top-left-radius: 0; border-bottom-left-radius: 0;">LOCAL FILE</button>
+    </div>
+
+    <div id="ytPanel" class="field" style="margin-bottom: 12px;">
+      <label>URL</label>
+      <input type="text" class="input" id="ytUrl" placeholder="https://youtube.com/watch?v=...">
+    </div>
+    <div id="filePanel" class="field" style="margin-bottom: 12px; display: none;">
+      <label>Absolute path to video file</label>
+      <input type="text" class="input" id="filePath" placeholder="C:\Users\you\Videos\forza.mp4">
+    </div>
+
+    <div class="grid grid-3" style="margin-bottom: 12px;">
+      <div class="field">
+        <label>Game</label>
+        <select class="select" id="gameVer">
+          <option value="fh4">FH4</option><option value="fh5">FH5</option><option value="fh6">FH6</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Sample every</label>
+        <select class="select" id="sampleRate">
+          <option value="0.5">0.5 s</option>
+          <option value="1.0" selected>1.0 s</option>
+          <option value="2.0">2.0 s</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Biome override</label>
+        <select class="select" id="biome">
+          <option value="">Auto-detect</option>
+          <option>city</option><option>coast</option><option>countryside</option>
+          <option>forest</option><option>mountain</option><option>desert</option>
+          <option>jungle</option><option>snow</option><option>highway</option><option>dirt</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn btn-accent btn-block" id="registerBtn">REGISTER SOURCE</button>
+  </section>
+
+  <section id="jobSection" style="display: none; margin-bottom: 10px;">
+    <div class="panel panel-warn">
+      <div class="panel-header">
+        <div class="section-label" style="color: var(--warn);">Current job</div>
+        <span class="pill pill-warn nums" id="jobPct">0%</span>
+      </div>
+      <div style="font-size: 13px; margin-bottom: 4px;" class="truncate" id="jobTitle">—</div>
+      <div class="nums" style="font-size: 11px; color: var(--ink-faint); margin-bottom: 10px;" id="jobMeta">—</div>
+      <div class="progress warn" style="margin-bottom: 12px;"><div id="jobBar" style="width: 0%;"></div></div>
+
+      <div class="grid grid-3" style="gap: 0; border-top: 1px solid var(--edge);">
+        <div style="padding: 10px; border-right: 1px solid var(--edge);">
+          <div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Sampled</div>
+          <div class="nums" style="font-size: 18px; font-weight: 500;" id="jobSampled">0</div>
+        </div>
+        <div style="padding: 10px; border-right: 1px solid var(--edge);">
+          <div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Accepted</div>
+          <div class="nums" style="font-size: 18px; font-weight: 500; color: var(--ok);" id="jobAccepted">0</div>
+        </div>
+        <div style="padding: 10px;">
+          <div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Rejected</div>
+          <div class="nums" style="font-size: 18px; font-weight: 500; color: var(--ink-dim);" id="jobRejected">0</div>
+        </div>
+      </div>
+
+      <button class="btn btn-danger btn-block" id="cancelBtn" style="margin-top: 12px;">CANCEL JOB</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <div class="section-label">Registered sources</div>
+      <span class="nums" style="font-size: 10px; color: var(--ink-faint);">click to set HUD mask + start</span>
+    </div>
+    <div id="sourceList" style="display: flex; flex-direction: column; gap: 6px;">
+      <div style="text-align: center; color: var(--ink-faint); font-size: 12px; padding: 24px; font-style: italic;">
+        No sources registered yet.
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="modal-backdrop" id="hudModal" style="display: none;">
+  <div style="max-width: 1100px; margin: 0 auto;" class="panel panel-accent">
+    <div class="panel-header">
+      <h2 style="font-size: 16px; font-weight: 500;">HUD mask editor</h2>
+      <button class="btn btn-sm" id="closeModal">CLOSE</button>
+    </div>
+    <div style="font-size: 11px; color: var(--ink-faint); margin-bottom: 10px; line-height: 1.5;">
+      Click and drag to mask HUD elements (speedometer, minimap, webcam). Click the × on any rectangle to remove it.
+    </div>
+    <div class="hud-editor" id="hudEditor"></div>
+    <div style="display: flex; gap: 8px; margin-top: 12px;">
+      <button class="btn btn-ok" id="saveMaskBtn" style="flex: 1;">SAVE MASK & START INGEST</button>
+      <button class="btn btn-danger" id="clearRects">CLEAR</button>
+    </div>
+  </div>
+</div>
+
+<script>
+ForzaTek.mount('ingest');
+const { api, fmt } = ForzaTek;
+
+let activeKind = 'yt';
+function setTab(k) {
+  activeKind = k;
+  document.getElementById('ytPanel').style.display  = k === 'yt'   ? 'block' : 'none';
+  document.getElementById('filePanel').style.display = k === 'file' ? 'block' : 'none';
+  document.getElementById('tabYT').className   = k === 'yt'   ? 'btn btn-accent' : 'btn';
+  document.getElementById('tabFile').className = k === 'file' ? 'btn btn-accent' : 'btn';
+  // re-apply connector radii
+  document.getElementById('tabYT').style.cssText   = 'flex:1; border-top-right-radius:0; border-bottom-right-radius:0; border-right:none;';
+  document.getElementById('tabFile').style.cssText = 'flex:1; border-top-left-radius:0; border-bottom-left-radius:0;';
+}
+document.getElementById('tabYT').addEventListener('click',   () => setTab('yt'));
+document.getElementById('tabFile').addEventListener('click', () => setTab('file'));
+
+document.getElementById('registerBtn').addEventListener('click', async () => {
+  const kind = activeKind === 'yt' ? 'youtube_url' : 'video_file';
+  const uri = activeKind === 'yt' ? document.getElementById('ytUrl').value : document.getElementById('filePath').value;
+  if (!uri.trim()) { alert('URL or path required'); return; }
+  try {
+    await api.post('/api/ingest/register', {
+      kind, uri,
+      game_version: document.getElementById('gameVer').value,
+      biome_override: document.getElementById('biome').value || null,
+    });
+    document.getElementById('ytUrl').value = '';
+    document.getElementById('filePath').value = '';
+    refresh();
+  } catch (e) { alert('Register failed: ' + e.message); }
+});
+
+let currentSourceId = null;
+let currentMaskRects = [];
+
+async function refresh() {
+  try {
+    const { sources } = await api.get('/api/ingest/sources');
+    document.getElementById('sourcesCount').textContent = `${sources.length} SOURCE${sources.length === 1 ? '' : 'S'}`;
+
+    const list = document.getElementById('sourceList');
+    if (!sources.length) {
+      list.innerHTML = '<div style="text-align: center; color: var(--ink-faint); font-size: 12px; padding: 24px; font-style: italic;">No sources registered yet.</div>';
+    } else {
+      list.innerHTML = sources.map(s => {
+        const cls = { done: 'pill-ok', processing: 'pill-warn', downloading: 'pill-warn', failed: 'pill-danger', cancelled: '', pending: '' }[s.status] || '';
+        return `
+          <div class="panel" style="padding: 10px; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center;" data-id="${s.id}" data-kind="${s.kind}" data-uri="${encodeURIComponent(s.uri)}">
+            <div style="min-width: 0;">
+              <div class="truncate" style="font-size: 12px;">${(s.title || s.uri).slice(0, 120)}</div>
+              <div class="nums truncate" style="font-size: 10px; color: var(--ink-faint); margin-top: 2px;">${(s.game_version || '').toUpperCase()} · ${s.kind === 'youtube_url' ? 'YT' : 'FILE'} · ${s.frames_accepted || 0} frames accepted</div>
+            </div>
+            <span class="pill ${cls}">${(s.status || '').toUpperCase()}</span>
+          </div>
+        `;
+      }).join('');
+      list.querySelectorAll('[data-id]').forEach(el => el.addEventListener('click', () => selectSource(el)));
+    }
+
+    const { job } = await api.get('/api/ingest/status');
+    const jobSection = document.getElementById('jobSection');
+    if (!job || (job.status !== 'downloading' && job.status !== 'processing')) {
+      jobSection.style.display = 'none';
+      document.getElementById('jobPill').style.display = 'none';
+    } else {
+      jobSection.style.display = 'block';
+      document.getElementById('jobPill').style.display = '';
+      const pct = Math.round((job.progress || 0) * 100);
+      document.getElementById('jobTitle').textContent = job.title || '—';
+      document.getElementById('jobMeta').textContent = `${(job.status || '').toUpperCase()} · ${Math.floor(job.current_video_time || 0)} / ${Math.floor(job.total_duration || 0)} s`;
+      document.getElementById('jobPct').textContent = pct + '%';
+      document.getElementById('jobPill').textContent = `JOB · ${pct}%`;
+      document.getElementById('jobPill').className = 'pill pill-warn nums';
+      document.getElementById('jobBar').style.width = pct + '%';
+      document.getElementById('jobSampled').textContent = job.frames_sampled || 0;
+      document.getElementById('jobAccepted').textContent = job.frames_accepted || 0;
+      const rej = (job.frames_rejected?.dedup || 0) + (job.frames_rejected?.non_gameplay || 0) + (job.frames_rejected?.encode_fail || 0);
+      document.getElementById('jobRejected').textContent = rej;
+    }
+  } catch (e) {}
+}
+
+async function selectSource(el) {
+  currentSourceId = parseInt(el.dataset.id);
+  const kind = el.dataset.kind;
+  const uri = decodeURIComponent(el.dataset.uri);
+  if (kind === 'video_file') {
+    try {
+      const res = await api.post('/api/ingest/probe_video', { uri });
+      openEditor('data:image/jpeg;base64,' + res.thumbnail_b64);
+    } catch (e) {
+      if (confirm('Could not preview. Start ingest without HUD mask?')) startIngest([]);
+    }
+  } else {
+    if (confirm('YouTube source — start without HUD mask? (To mask, download manually and re-register as a local file.)')) startIngest([]);
+  }
+}
+
+let drawing = null;
+function openEditor(src) {
+  currentMaskRects = [];
+  document.getElementById('hudModal').style.display = 'block';
+  const ed = document.getElementById('hudEditor');
+  ed.innerHTML = `<img src="${src}">`;
+  ed.addEventListener('mousedown', onDown);
+  ed.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+}
+function onDown(e) {
+  if (e.target.classList.contains('close')) return;
+  const r = document.getElementById('hudEditor').getBoundingClientRect();
+  drawing = { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, w: 0, h: 0 };
+}
+function onMove(e) {
+  if (!drawing) return;
+  const r = document.getElementById('hudEditor').getBoundingClientRect();
+  drawing.w = (e.clientX - r.left) / r.width - drawing.x;
+  drawing.h = (e.clientY - r.top) / r.height - drawing.y;
+  renderRects(drawing);
+}
+function onUp() {
+  if (!drawing) return;
+  if (Math.abs(drawing.w) > 0.02 && Math.abs(drawing.h) > 0.02) {
+    currentMaskRects.push({
+      x: Math.min(drawing.x, drawing.x + drawing.w),
+      y: Math.min(drawing.y, drawing.y + drawing.h),
+      w: Math.abs(drawing.w), h: Math.abs(drawing.h),
+    });
+  }
+  drawing = null;
+  renderRects();
+}
+function renderRects(preview) {
+  const ed = document.getElementById('hudEditor');
+  ed.querySelectorAll('.rect').forEach(e => e.remove());
+  const items = [...currentMaskRects];
+  if (preview) items.push({
+    x: Math.min(preview.x, preview.x + preview.w),
+    y: Math.min(preview.y, preview.y + preview.h),
+    w: Math.abs(preview.w), h: Math.abs(preview.h),
+    preview: true,
+  });
+  items.forEach((r, i) => {
+    const el = document.createElement('div');
+    el.className = 'rect';
+    el.style.cssText = `left: ${r.x*100}%; top: ${r.y*100}%; width: ${r.w*100}%; height: ${r.h*100}%;`;
+    if (!r.preview) {
+      const c = document.createElement('div');
+      c.className = 'close'; c.textContent = '×';
+      c.onclick = (e) => { e.stopPropagation(); currentMaskRects.splice(i, 1); renderRects(); };
+      el.appendChild(c);
+    }
+    ed.appendChild(el);
+  });
+}
+
+document.getElementById('closeModal').onclick = () => document.getElementById('hudModal').style.display = 'none';
+document.getElementById('clearRects').onclick = () => { currentMaskRects = []; renderRects(); };
+document.getElementById('saveMaskBtn').onclick = () => {
+  document.getElementById('hudModal').style.display = 'none';
+  startIngest(currentMaskRects);
+};
+document.getElementById('cancelBtn').addEventListener('click', async () => {
+  try { await api.post('/api/ingest/cancel'); refresh(); } catch (e) {}
+});
+
+async function startIngest(mask) {
+  try {
+    await api.post('/api/ingest/start', {
+      source_id: currentSourceId,
+      sample_every_sec: parseFloat(document.getElementById('sampleRate').value),
+      hud_mask: mask || [],
+    });
+    refresh();
+  } catch (e) { alert('Failed to start: ' + e.message); }
+}
+
+setInterval(refresh, 1500); refresh();
+</script>
+</body>
+</html>

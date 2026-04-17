@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ForzaTek — Telemetry</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js"></script>
+</head>
+<body>
+
+<main class="page">
+
+  <header class="page-header">
+    <div>
+      <div class="crumb">Runtime / telemetry</div>
+      <h1>Live telemetry</h1>
+    </div>
+    <div class="pills">
+      <span class="pill" id="udpStatus">NO SIGNAL</span>
+      <span class="pill nums" id="rateStatus">— Hz</span>
+    </div>
+  </header>
+
+  <!-- Gauges -->
+  <section class="grid grid-2" style="margin-bottom: 10px;">
+    <div class="panel">
+      <div class="section-label" style="margin-bottom: 10px;">Speed</div>
+      <div style="display: flex; justify-content: center;">
+        <svg width="100%" height="130" viewBox="0 0 240 130" style="max-width: 280px;">
+          <path d="M 20 110 A 100 100 0 0 1 220 110" fill="none" stroke="var(--edge)" stroke-width="12" stroke-linecap="round"/>
+          <path id="speedArc" d="M 20 110 A 100 100 0 0 1 20 110" fill="none" stroke="var(--accent)" stroke-width="12" stroke-linecap="round"/>
+          <text id="speedVal" x="120" y="82" font-family="JetBrains Mono" font-size="28" font-weight="500" fill="var(--ink)" text-anchor="middle">—</text>
+          <text x="120" y="100" font-family="JetBrains Mono" font-size="10" fill="var(--ink-faint)" text-anchor="middle" letter-spacing="1.5">MPH</text>
+        </svg>
+      </div>
+      <div class="grid grid-3" style="gap: 0; border-top: 1px solid var(--edge); padding-top: 8px; text-align: center;">
+        <div><div class="section-label" style="font-size: 9px;">MIN</div><div class="nums" style="font-size: 13px;" id="speedMin">—</div></div>
+        <div><div class="section-label" style="font-size: 9px;">AVG</div><div class="nums" style="font-size: 13px;" id="speedAvg">—</div></div>
+        <div><div class="section-label" style="font-size: 9px;">MAX</div><div class="nums" style="font-size: 13px;" id="speedMax">—</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-label" style="margin-bottom: 10px;">Engine RPM</div>
+      <div style="display: flex; justify-content: center;">
+        <svg width="100%" height="130" viewBox="0 0 240 130" style="max-width: 280px;">
+          <path d="M 20 110 A 100 100 0 0 1 220 110" fill="none" stroke="var(--edge)" stroke-width="12" stroke-linecap="round"/>
+          <path d="M 196 110 A 100 100 0 0 1 220 110" fill="none" stroke="var(--danger)" stroke-width="12" stroke-linecap="round" opacity="0.55"/>
+          <path id="rpmArc" d="M 20 110 A 100 100 0 0 1 20 110" fill="none" stroke="var(--accent)" stroke-width="12" stroke-linecap="round"/>
+          <text id="rpmVal" x="120" y="82" font-family="JetBrains Mono" font-size="28" font-weight="500" fill="var(--ink)" text-anchor="middle">—</text>
+          <text x="120" y="100" font-family="JetBrains Mono" font-size="10" fill="var(--ink-faint)" text-anchor="middle" letter-spacing="1.5">RPM</text>
+        </svg>
+      </div>
+      <div class="grid grid-3" style="gap: 0; border-top: 1px solid var(--edge); padding-top: 8px; text-align: center;">
+        <div><div class="section-label" style="font-size: 9px;">IDLE</div><div class="nums" style="font-size: 13px;">800</div></div>
+        <div><div class="section-label" style="font-size: 9px;">REDLINE</div><div class="nums" style="font-size: 13px; color: var(--danger);" id="redline">7,200</div></div>
+        <div><div class="section-label" style="font-size: 9px;">GEAR</div><div class="nums" style="font-size: 13px;" id="gearVal">—</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Control input traces -->
+  <section class="panel" style="margin-bottom: 10px;">
+    <div class="panel-header">
+      <div class="section-label">Control inputs</div>
+      <span class="nums" style="font-size: 10px; color: var(--ink-faint);">last 60 s</span>
+    </div>
+
+    <div style="margin-bottom: 12px;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+        <span class="section-label" style="font-size: 10px;">THROTTLE</span>
+        <span class="nums" style="font-size: 11px; color: var(--ok);" id="throttleVal">—</span>
+      </div>
+      <svg width="100%" height="38" viewBox="0 0 600 40" preserveAspectRatio="none" style="display: block; background: var(--surface-2); border-radius: 2px;">
+        <polyline id="throttleFill" fill="rgba(127, 176, 105, 0.2)" stroke="none"/>
+        <polyline id="throttleLine" fill="none" stroke="var(--ok)" stroke-width="1.5"/>
+      </svg>
+    </div>
+
+    <div style="margin-bottom: 12px;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+        <span class="section-label" style="font-size: 10px;">BRAKE</span>
+        <span class="nums" style="font-size: 11px; color: var(--danger);" id="brakeVal">—</span>
+      </div>
+      <svg width="100%" height="38" viewBox="0 0 600 40" preserveAspectRatio="none" style="display: block; background: var(--surface-2); border-radius: 2px;">
+        <polyline id="brakeFill" fill="rgba(192, 96, 96, 0.2)" stroke="none"/>
+        <polyline id="brakeLine" fill="none" stroke="var(--danger)" stroke-width="1.5"/>
+      </svg>
+    </div>
+
+    <div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+        <span class="section-label" style="font-size: 10px;">STEER</span>
+        <span class="nums" style="font-size: 11px;" id="steerVal">—</span>
+      </div>
+      <svg width="100%" height="44" viewBox="0 0 600 50" preserveAspectRatio="none" style="display: block; background: var(--surface-2); border-radius: 2px;">
+        <line x1="0" y1="25" x2="600" y2="25" stroke="var(--edge)" stroke-width="0.5" stroke-dasharray="2 2"/>
+        <polyline id="steerLine" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+      </svg>
+    </div>
+  </section>
+
+  <!-- Track map + vehicle state -->
+  <section class="grid grid-2" style="margin-bottom: 10px;">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="section-label">Track map</div>
+        <span class="nums" style="font-size: 10px; color: var(--ink-faint);">60 s trail</span>
+      </div>
+      <div style="background: var(--surface-2); border-radius: 2px; padding: 6px; aspect-ratio: 1.6;">
+        <svg width="100%" height="100%" viewBox="0 0 320 200">
+          <line x1="0" y1="50"  x2="320" y2="50"  stroke="var(--edge)" stroke-width="0.3" stroke-dasharray="2 4"/>
+          <line x1="0" y1="100" x2="320" y2="100" stroke="var(--edge)" stroke-width="0.3" stroke-dasharray="2 4"/>
+          <line x1="0" y1="150" x2="320" y2="150" stroke="var(--edge)" stroke-width="0.3" stroke-dasharray="2 4"/>
+          <line x1="80"  y1="0" x2="80"  y2="200" stroke="var(--edge)" stroke-width="0.3" stroke-dasharray="2 4"/>
+          <line x1="160" y1="0" x2="160" y2="200" stroke="var(--edge)" stroke-width="0.3" stroke-dasharray="2 4"/>
+          <line x1="240" y1="0" x2="240" y2="200" stroke="var(--edge)" stroke-width="0.3" stroke-dasharray="2 4"/>
+          <polyline id="trackPath" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" opacity="0.9"/>
+          <circle id="trackDot" cx="-10" cy="-10" r="4" fill="var(--accent)"/>
+        </svg>
+      </div>
+      <div class="grid grid-3" style="gap: 0; border-top: 1px solid var(--edge); padding-top: 8px; margin-top: 10px;">
+        <div><div class="section-label" style="font-size: 9px;">X</div><div class="nums" style="font-size: 12px;" id="posX">—</div></div>
+        <div><div class="section-label" style="font-size: 9px;">Y</div><div class="nums" style="font-size: 12px;" id="posY">—</div></div>
+        <div><div class="section-label" style="font-size: 9px;">HDG</div><div class="nums" style="font-size: 12px;" id="posHdg">—</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-label" style="margin-bottom: 12px;">Vehicle state</div>
+      <div class="kv"><span class="k">Car</span><span class="v truncate" id="vCar">—</span></div>
+      <div class="kv"><span class="k">Drivetrain</span><span class="v" id="vDrive">—</span></div>
+      <div class="kv"><span class="k">Tire temp</span><span class="v" id="vTire">—</span></div>
+      <div class="kv"><span class="k">Fuel</span><span class="v" id="vFuel">—</span></div>
+      <div class="kv"><span class="k">Lap</span><span class="v" id="vLap">—</span></div>
+      <div class="kv"><span class="k">Last lap</span><span class="v" id="vLast">—</span></div>
+      <div class="kv"><span class="k">Best lap</span><span class="v ok" id="vBest">—</span></div>
+      <div class="kv"><span class="k">Delta</span><span class="v" id="vDelta">—</span></div>
+    </div>
+  </section>
+
+  <!-- G-forces -->
+  <section class="panel">
+    <div class="panel-header">
+      <div class="section-label">G-forces</div>
+      <span class="nums" style="font-size: 10px; color: var(--ink-faint);">lat · long</span>
+    </div>
+    <div style="display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 14px; align-items: center;">
+      <div style="display: flex; justify-content: center;">
+        <svg width="130" height="130" viewBox="0 0 130 130">
+          <circle cx="65" cy="65" r="60" fill="none" stroke="var(--edge)" stroke-width="0.5"/>
+          <circle cx="65" cy="65" r="40" fill="none" stroke="var(--edge)" stroke-width="0.3" stroke-dasharray="2 3"/>
+          <circle cx="65" cy="65" r="20" fill="none" stroke="var(--edge)" stroke-width="0.3" stroke-dasharray="2 3"/>
+          <line x1="5" y1="65" x2="125" y2="65" stroke="var(--edge)" stroke-width="0.3"/>
+          <line x1="65" y1="5" x2="65" y2="125" stroke="var(--edge)" stroke-width="0.3"/>
+          <g id="gTrail"></g>
+          <circle id="gDot" cx="65" cy="65" r="4" fill="var(--warn)"/>
+        </svg>
+      </div>
+      <div class="grid grid-4" style="gap: 8px;">
+        <div class="stat"><div class="stat-label">Lateral</div><div class="stat-value" id="gLat">—</div></div>
+        <div class="stat"><div class="stat-label">Longitudinal</div><div class="stat-value" id="gLong">—</div></div>
+        <div class="stat"><div class="stat-label">Peak lat</div><div class="stat-value warn" id="gLatPeak">—</div></div>
+        <div class="stat"><div class="stat-label">Peak long</div><div class="stat-value danger" id="gLongPeak">—</div></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+ForzaTek.mount('telemetry');
+const { api, fmt } = ForzaTek;
+
+const state = {
+  history: [],   // rolling 60 s of samples
+  maxSpeed: 0, minSpeed: Infinity, sumSpeed: 0, countSpeed: 0,
+  peakLat: 0, peakLong: 0,
+  gTrail: [],
+  trackMin: { x: Infinity, y: Infinity }, trackMax: { x: -Infinity, y: -Infinity },
+};
+
+function setArc(id, v, vmax) {
+  const r = 100, cx = 120, cy = 110;
+  const pct = Math.max(0, Math.min(1, v / vmax));
+  const angle = Math.PI * (1 - pct); // left half of circle, from π to 0
+  const x = cx + r * Math.cos(Math.PI - angle);
+  const y = cy - r * Math.sin(Math.PI - angle);
+  const largeArc = pct > 0.5 ? 1 : 0;
+  const d = `M 20 ${cy} A ${r} ${r} 0 ${largeArc} 1 ${x.toFixed(1)} ${y.toFixed(1)}`;
+  document.getElementById(id).setAttribute('d', d);
+}
+
+function points(values, w, h, scaler) {
+  if (!values.length) return '';
+  const n = values.length;
+  return values.map((v, i) => {
+    const x = (i / (n - 1 || 1)) * w;
+    const y = scaler(v, h);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+}
+
+function updateGraphs() {
+  const n = state.history.length;
+  if (!n) return;
+  const tVals = state.history.map(s => s.throttle || 0);
+  const bVals = state.history.map(s => s.brake || 0);
+  const sVals = state.history.map(s => s.steer || 0);
+
+  const w = 600, h = 40, hs = 50;
+  const posLine = (v, h) => h - v * h;
+  const negCenter = (v, h) => h/2 - (v * (h/2));
+
+  const tPts = points(tVals, w, h, posLine);
+  document.getElementById('throttleLine').setAttribute('points', tPts);
+  document.getElementById('throttleFill').setAttribute('points', `0,${h} ${tPts} ${w},${h}`);
+
+  const bPts = points(bVals, w, h, posLine);
+  document.getElementById('brakeLine').setAttribute('points', bPts);
+  document.getElementById('brakeFill').setAttribute('points', `0,${h} ${bPts} ${w},${h}`);
+
+  const sPts = points(sVals, w, hs, negCenter);
+  document.getElementById('steerLine').setAttribute('points', sPts);
+}
+
+function updateTrack() {
+  const pts = state.history.map(s => ({ x: s.pos_x, y: s.pos_y })).filter(p => p.x != null && p.y != null);
+  if (!pts.length) return;
+  pts.forEach(p => {
+    state.trackMin.x = Math.min(state.trackMin.x, p.x);
+    state.trackMin.y = Math.min(state.trackMin.y, p.y);
+    state.trackMax.x = Math.max(state.trackMax.x, p.x);
+    state.trackMax.y = Math.max(state.trackMax.y, p.y);
+  });
+  const dx = state.trackMax.x - state.trackMin.x || 1;
+  const dy = state.trackMax.y - state.trackMin.y || 1;
+  const pad = 20;
+  const proj = p => ({
+    x: pad + ((p.x - state.trackMin.x) / dx) * (320 - 2*pad),
+    y: pad + ((state.trackMax.y - p.y) / dy) * (200 - 2*pad),
+  });
+  const poly = pts.map(p => { const q = proj(p); return `${q.x.toFixed(1)},${q.y.toFixed(1)}`; }).join(' ');
+  document.getElementById('trackPath').setAttribute('points', poly);
+  const last = proj(pts[pts.length - 1]);
+  document.getElementById('trackDot').setAttribute('cx', last.x);
+  document.getElementById('trackDot').setAttribute('cy', last.y);
+}
+
+function updateGForce(latG, longG) {
+  const cx = 65, cy = 65, r = 50;
+  const dx = Math.max(-2, Math.min(2, latG)) * r / 2;
+  const dy = -Math.max(-2, Math.min(2, longG)) * r / 2;
+  document.getElementById('gDot').setAttribute('cx', cx + dx);
+  document.getElementById('gDot').setAttribute('cy', cy + dy);
+
+  state.gTrail.push({ x: cx + dx, y: cy + dy });
+  if (state.gTrail.length > 20) state.gTrail.shift();
+  const trailHtml = state.gTrail.slice(0, -1).map((p, i) => {
+    const op = (i / state.gTrail.length) * 0.7;
+    return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="var(--warn)" opacity="${op.toFixed(2)}"/>`;
+  }).join('');
+  document.getElementById('gTrail').innerHTML = trailHtml;
+}
+
+async function poll() {
+  try {
+    const d = await api.get('/api/telemetry/live');
+    if (!d || d.speed == null) {
+      document.getElementById('udpStatus').textContent = 'NO SIGNAL';
+      document.getElementById('udpStatus').className = 'pill pill-danger';
+      document.getElementById('rateStatus').textContent = '— Hz';
+      return;
+    }
+    document.getElementById('udpStatus').textContent = '● UDP :' + (d.port || 5300);
+    document.getElementById('udpStatus').className = 'pill pill-ok';
+    document.getElementById('rateStatus').textContent = (d.rate_hz || 0).toFixed(1) + ' Hz';
+
+    setArc('speedArc', d.speed || 0, 200);
+    document.getElementById('speedVal').textContent = Math.round(d.speed || 0);
+    setArc('rpmArc', d.rpm || 0, 8000);
+    document.getElementById('rpmVal').textContent = fmt.n(d.rpm || 0);
+    document.getElementById('gearVal').textContent = d.gear ?? '—';
+    document.getElementById('redline').textContent = fmt.n(d.redline || 7200);
+
+    state.minSpeed = Math.min(state.minSpeed, d.speed || 0);
+    state.maxSpeed = Math.max(state.maxSpeed, d.speed || 0);
+    state.sumSpeed += d.speed || 0; state.countSpeed++;
+    document.getElementById('speedMin').textContent = Math.round(state.minSpeed === Infinity ? 0 : state.minSpeed);
+    document.getElementById('speedMax').textContent = Math.round(state.maxSpeed);
+    document.getElementById('speedAvg').textContent = Math.round(state.sumSpeed / state.countSpeed);
+
+    document.getElementById('throttleVal').textContent = (d.throttle || 0).toFixed(2);
+    document.getElementById('brakeVal').textContent = (d.brake || 0).toFixed(2);
+    const s = d.steer || 0;
+    document.getElementById('steerVal').textContent = (s >= 0 ? '+' : '') + s.toFixed(2);
+
+    state.history.push(d);
+    if (state.history.length > 120) state.history.shift();
+    updateGraphs();
+    updateTrack();
+
+    document.getElementById('posX').textContent = d.pos_x != null ? d.pos_x.toFixed(1) : '—';
+    document.getElementById('posY').textContent = d.pos_y != null ? d.pos_y.toFixed(1) : '—';
+    document.getElementById('posHdg').textContent = d.heading != null ? Math.round(d.heading) + '°' : '—';
+
+    document.getElementById('vCar').textContent = d.car || '—';
+    document.getElementById('vDrive').textContent = d.drivetrain || '—';
+    document.getElementById('vTire').textContent = d.tire_temp != null ? d.tire_temp.toFixed(0) + ' °C' : '—';
+    document.getElementById('vFuel').textContent = d.fuel != null ? (d.fuel * 100).toFixed(0) + ' %' : '—';
+    document.getElementById('vLap').textContent = d.lap != null ? `${d.lap} / ${d.lap_total || '—'}` : '—';
+    document.getElementById('vLast').textContent = d.last_lap != null ? d.last_lap.toFixed(3) : '—';
+    document.getElementById('vBest').textContent = d.best_lap != null ? d.best_lap.toFixed(3) : '—';
+    if (d.last_lap != null && d.best_lap != null) {
+      const delta = d.last_lap - d.best_lap;
+      const de = document.getElementById('vDelta');
+      de.textContent = (delta >= 0 ? '+' : '') + delta.toFixed(3);
+      de.className = 'v ' + (delta >= 0 ? 'danger' : 'ok');
+    }
+
+    const latG = d.g_lat || 0, longG = d.g_long || 0;
+    updateGForce(latG, longG);
+    state.peakLat = Math.max(state.peakLat, Math.abs(latG));
+    state.peakLong = Math.max(state.peakLong, Math.abs(longG));
+    document.getElementById('gLat').textContent  = (latG >= 0 ? '+' : '') + latG.toFixed(2) + ' g';
+    document.getElementById('gLong').textContent = (longG >= 0 ? '+' : '') + longG.toFixed(2) + ' g';
+    document.getElementById('gLatPeak').textContent  = state.peakLat.toFixed(2) + ' g';
+    document.getElementById('gLongPeak').textContent = '−' + state.peakLong.toFixed(2) + ' g';
+  } catch (e) {
+    document.getElementById('udpStatus').textContent = 'NO SIGNAL';
+    document.getElementById('udpStatus').className = 'pill pill-danger';
+  }
+}
+
+setInterval(poll, 100); poll();
+</script>
+</body>
+</html>
