@@ -28,3 +28,6 @@ training/_progress.json
 
 # Misc
 *.log
+
+.mp4
+yolo11x.pt

@@ -7,6 +7,26 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/app.js"></script>
+<style>
+  .stat { padding: 10px; }
+  .stat-label { font-size: 9px; color: var(--ink-faint); letter-spacing: 0.1em; text-transform: uppercase; }
+  .stat-value { font-size: 18px; font-weight: 500; margin-top: 2px; }
+  .stat-value.ok { color: var(--ok); }
+  .chart-box { height: 200px; width: 100%; position: relative; }
+  .log-box {
+    background: var(--bg);
+    border: 1px solid var(--edge);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--ink-dim);
+    padding: 10px;
+    overflow-y: auto;
+    max-height: 260px;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+</style>
 </head>
 <body>
 
@@ -15,79 +35,70 @@
   <header class="page-header">
     <div>
       <div class="crumb">Model / train</div>
-      <h1>Training &amp; active learning</h1>
+      <h1>Perception training</h1>
     </div>
     <div class="pills">
       <span class="pill" id="trainStatus">IDLE</span>
-      <span class="pill" id="roundPill">ROUND —</span>
+      <span class="pill" id="ckPill" style="display: none;">NO CHECKPOINT</span>
     </div>
   </header>
 
-  <!-- Active learning loop strip -->
-  <section class="panel" style="margin-bottom: 10px;">
-    <div class="section-label" style="margin-bottom: 12px;">Active learning loop</div>
-    <div id="alStrip" class="grid grid-4" style="gap: 0; border: 1px solid var(--edge);">
-      <!-- 4 stage cells populated by JS -->
-    </div>
-  </section>
-
   <div class="grid grid-2" style="margin-bottom: 10px;">
 
-    <!-- Configuration -->
     <div class="panel">
-      <div class="section-label" style="margin-bottom: 12px;">Training configuration</div>
+      <div class="section-label" style="margin-bottom: 12px;">Configuration</div>
       <div class="grid grid-2" style="margin-bottom: 10px;">
         <div class="field">
-          <label>Round</label>
-          <input type="number" class="input" id="cRound" value="1" min="1">
-        </div>
-        <div class="field">
           <label>Epochs</label>
-          <input type="number" class="input" id="cEpochs" value="30" min="1">
+          <input type="number" class="input" id="cEpochs" value="60" min="1">
         </div>
         <div class="field">
           <label>Batch size</label>
-          <input type="number" class="input" id="cBatch" value="8" min="1">
+          <input type="number" class="input" id="cBatch" value="16" min="1">
         </div>
         <div class="field">
           <label>Learning rate</label>
           <input type="text" class="input" id="cLR" value="3e-4">
         </div>
+        <div class="field">
+          <label>Workers</label>
+          <input type="number" class="input" id="cWorkers" value="4" min="0">
+        </div>
       </div>
       <div class="field" style="margin-bottom: 12px;">
-        <label>Resume from</label>
-        <select class="select" id="cResume">
-          <option value="">None (train from scratch)</option>
-        </select>
+        <label>Resume from (optional)</label>
+        <input type="text" class="input" id="cResume" placeholder="models/perception_v1.pt">
       </div>
       <div style="display: flex; gap: 8px;">
         <button class="btn btn-accent" id="trainBtn" style="flex: 1;">START TRAINING</button>
         <button class="btn btn-danger" id="stopBtn" style="flex: 1;" disabled>STOP</button>
       </div>
 
-      <div class="divider"></div>
-
-      <div class="section-label" style="margin-bottom: 10px;">Dataset ready</div>
-      <div class="grid grid-3" style="gap: 0; border: 1px solid var(--edge);">
-        <div style="padding: 10px; border-right: 1px solid var(--edge);">
-          <div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Seg labels</div>
-          <div class="nums" style="font-size: 18px; font-weight: 500;" id="dSeg">0</div>
+      <div style="border-top: 1px solid var(--edge); margin-top: 14px; padding-top: 14px;">
+        <div class="section-label" style="margin-bottom: 10px;">Dataset</div>
+        <div class="grid grid-3" style="gap: 0; border: 1px solid var(--edge);">
+          <div class="stat" style="border-right: 1px solid var(--edge);">
+            <div class="stat-label">Total frames</div>
+            <div class="stat-value" id="sTotal">&mdash;</div>
+          </div>
+          <div class="stat" style="border-right: 1px solid var(--edge);">
+            <div class="stat-label">Labeled</div>
+            <div class="stat-value" id="sLabeled">&mdash;</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Both seg+det</div>
+            <div class="stat-value ok" id="sBoth">&mdash;</div>
+          </div>
         </div>
-        <div style="padding: 10px; border-right: 1px solid var(--edge);">
-          <div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Det labels</div>
-          <div class="nums" style="font-size: 18px; font-weight: 500;" id="dDet">0</div>
-        </div>
-        <div style="padding: 10px;">
-          <div class="section-label" style="font-size: 9px; margin-bottom: 2px;">Both</div>
-          <div class="nums" style="font-size: 18px; font-weight: 500; color: var(--ok);" id="dBoth">0</div>
-        </div>
+        <div id="dReady" style="font-size: 11px; color: var(--ink-faint); margin-top: 8px; line-height: 1.5;">&mdash;</div>
       </div>
-      <div style="font-size: 11px; color: var(--ink-faint); margin-top: 10px; line-height: 1.5;" id="dReady">
-        Need at least 50 frames with both seg + det labels to train.
+
+      <div style="border-top: 1px solid var(--edge); margin-top: 14px; padding-top: 14px;">
+        <div class="section-label" style="margin-bottom: 10px;">Active checkpoint</div>
+        <div id="ckBox" style="font-size: 11px; color: var(--ink-faint);">No checkpoint yet.</div>
       </div>
     </div>
 
-    <!-- Live progress -->
     <div class="panel">
       <div class="section-label" style="margin-bottom: 12px;">Live training progress</div>
       <div id="progArea">
@@ -99,165 +110,206 @@
 
   </div>
 
-  <!-- Checkpoints -->
+  <section class="panel" style="margin-bottom: 10px;">
+    <div class="panel-header">
+      <div class="section-label">Training history</div>
+    </div>
+    <div class="chart-box" id="chartArea">
+      <canvas id="chart"></canvas>
+    </div>
+  </section>
+
   <section class="panel">
     <div class="panel-header">
-      <div class="section-label">Checkpoints</div>
-      <span class="nums" style="font-size: 10px; color: var(--ink-faint);" id="ckCount">0 SAVED</span>
+      <div class="section-label">Training log</div>
+      <button class="btn btn-sm" id="refreshLog">REFRESH</button>
     </div>
-    <div id="checkpoints" style="display: flex; flex-direction: column; gap: 6px;">
-      <div style="text-align: center; color: var(--ink-faint); font-size: 12px; padding: 24px; font-style: italic;">
-        No models trained yet.
-      </div>
-    </div>
+    <div class="log-box" id="logBox">(click REFRESH to load)</div>
   </section>
 
 </main>
 
 <script>
 ForzaTek.mount('train');
-const { api, fmt, confClass } = ForzaTek;
+const { api, fmt } = ForzaTek;
 
-function renderALStrip(activeRound) {
-  const stages = [
-    { n: 1, label: 'BOOTSTRAP', desc: '500 manual labels' },
-    { n: 2, label: 'ROUND 1',   desc: 'Train + queue 50' },
-    { n: 3, label: 'ROUND 2',   desc: 'Review + retrain' },
-    { n: 4, label: 'ROUND 3+',  desc: 'Iterate until plateau' },
-  ];
-  const cur = activeRound || 0;
-  document.getElementById('alStrip').innerHTML = stages.map(st => {
-    let status, cls, color;
-    if (st.n <= cur) { status = 'done'; cls = 'ok'; color = 'var(--ok)'; }
-    else if (st.n === cur + 1) { status = 'next'; cls = 'warn'; color = 'var(--warn)'; }
-    else { status = 'later'; cls = 'dim'; color = 'var(--ink-faint)'; }
-    return `
-      <div style="padding: 12px; ${st.n < 4 ? 'border-right: 1px solid var(--edge);' : ''} ${status === 'next' ? 'background: var(--warn-bg);' : ''}">
-        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-          <span class="nums" style="width: 18px; height: 18px; flex-shrink: 0; border: 1px solid ${color}; color: ${color}; font-size: 10px; display: flex; align-items: center; justify-content: center; border-radius: 2px;">${st.n}</span>
-          <span class="nums" style="font-size: 10px; letter-spacing: 0.1em; color: ${color};">${st.label}</span>
-        </div>
-        <div style="font-size: 11px; color: ${status === 'later' ? 'var(--ink-dim)' : 'var(--ink)'}; line-height: 1.4;">${st.desc}</div>
-        <div class="nums" style="font-size: 9px; color: ${color}; margin-top: 4px;">${status}</div>
-      </div>
-    `;
-  }).join('');
+async function refreshStats() {
+  try {
+    const s = await api.get('/api/perception/stats');
+    document.getElementById('sTotal').textContent = fmt.n(s.total_frames);
+    document.getElementById('sLabeled').textContent = fmt.n(s.labeled_frames);
+    document.getElementById('sBoth').textContent = fmt.n(s.both_labels);
+
+    const ready = s.ready_to_train;
+    document.getElementById('dReady').innerHTML = ready
+      ? `<span style="color: var(--ok);">Ready to train. ${s.both_labels} frames with both seg + det labels.</span>`
+      : `<span style="color: var(--warn);">Need ${100 - s.both_labels} more labeled frames (min 100).</span>`;
+    document.getElementById('trainBtn').disabled = !ready;
+
+    const ckBox = document.getElementById('ckBox');
+    if (s.checkpoint) {
+      ckBox.innerHTML = `
+        <div style="font-size:12px;color:var(--ink);">models/perception_v1.pt &middot; ${s.checkpoint.size_mb} MB</div>
+        <div class="nums" style="font-size:10px;margin-top:4px;">
+          Epoch ${s.checkpoint.epoch || '?'} &middot;
+          <span style="color:var(--ok);">road IoU ${(s.checkpoint.best_miou_road || 0).toFixed(3)}</span>
+        </div>`;
+      document.getElementById('ckPill').style.display = '';
+      document.getElementById('ckPill').textContent = `CKPT ${(s.checkpoint.best_miou_road || 0).toFixed(3)}`;
+      document.getElementById('ckPill').className = 'pill pill-ok';
+    } else {
+      ckBox.textContent = 'No checkpoint yet. Train a model first.';
+      document.getElementById('ckPill').style.display = 'none';
+    }
+  } catch(e) {}
 }
 
-async function refresh() {
+async function refreshProgress() {
   try {
-    const p = await api.get('/api/label/progress');
-    document.getElementById('dSeg').textContent = fmt.n(p.seg_labels || 0);
-    document.getElementById('dDet').textContent = fmt.n(p.det_labels || 0);
-    const both = Math.min(p.seg_labels || 0, p.det_labels || 0);
-    document.getElementById('dBoth').textContent = fmt.n(both);
+    const t = await api.get('/api/perception/progress');
+    const running = !!t.running;
+    const status = t.status || 'idle';
+    const epoch = t.current_epoch || 0;
+    const totalEp = t.total_epochs || 1;
+    const pct = totalEp > 0 ? Math.round(100 * epoch / totalEp) : 0;
 
-    const ready = both >= 50;
-    document.getElementById('dReady').innerHTML = ready
-      ? `<span style="color: var(--ok);">Ready to train. ${both} frames with both seg + det labels.</span>`
-      : `<span style="color: var(--warn);">Need ${50 - both} more labeled frames before training.</span>`;
-    document.getElementById('trainBtn').disabled = !ready;
-  } catch (e) {}
-
-  try {
-    const s = await api.get('/api/system/stats');
-    renderALStrip(s.active_model?.round_num || 0);
-    document.getElementById('roundPill').textContent = s.active_model ? `ROUND ${s.active_model.round_num}` : 'ROUND —';
-  } catch (e) {}
-
-  try {
-    const r = await api.get('/api/train/models');
-    const models = r.models || [];
-    document.getElementById('ckCount').textContent = `${models.length} SAVED · ${models.filter(m => m.is_active).length} ACTIVE`;
-
-    const sel = document.getElementById('cResume');
-    const currentVal = sel.value;
-    sel.innerHTML = '<option value="">None (train from scratch)</option>' + models.map(m => {
-      const mx = JSON.parse(m.metrics_json || '{}');
-      const miou = mx.best_mIoU != null ? mx.best_mIoU.toFixed(3) : '—';
-      return `<option value="${m.path}">${m.name} · round ${m.round_num} · mIoU ${miou}</option>`;
-    }).join('');
-    sel.value = currentVal;
-
-    const list = document.getElementById('checkpoints');
-    if (!models.length) {
-      list.innerHTML = '<div style="text-align: center; color: var(--ink-faint); font-size: 12px; padding: 24px; font-style: italic;">No models trained yet.</div>';
+    const statusEl = document.getElementById('trainStatus');
+    if (running) {
+      statusEl.textContent = `EPOCH ${epoch}/${totalEp}`;
+      statusEl.className = 'pill pill-warn';
+    } else if (status === 'done') {
+      statusEl.textContent = 'DONE';
+      statusEl.className = 'pill pill-ok';
+    } else if (status === 'crashed') {
+      statusEl.textContent = 'CRASHED';
+      statusEl.className = 'pill pill-danger';
     } else {
-      list.innerHTML = models.map(m => {
-        const mx = JSON.parse(m.metrics_json || '{}');
-        const miou = mx.best_mIoU != null ? mx.best_mIoU.toFixed(3) : '—';
-        const conf = mx.mean_det_conf != null ? mx.mean_det_conf.toFixed(2) : '—';
-        const confCls = mx.mean_det_conf != null ? confClass(mx.mean_det_conf) : '';
-        const statusCls = m.is_active ? 'pill-ok' : '';
-        const statusText = m.is_active ? 'ACTIVE' : 'ARCHIVED';
-        const bg = m.is_active ? 'background: var(--surface-2); border-color: var(--ok);' : '';
-        return `
-          <div class="panel" style="padding: 10px 12px; ${bg} display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 12px; align-items: center;">
-            <div style="min-width: 0;">
-              <div class="nums truncate" style="font-size: 12px;">${m.name}</div>
-              <div class="nums" style="font-size: 10px; color: var(--ink-faint); margin-top: 2px;">round ${m.round_num} · ${fmt.n(m.trained_on)} frames · ${new Date(m.created_at * 1000).toLocaleString()}</div>
-            </div>
-            <div style="text-align: right;">
-              <div class="section-label" style="font-size: 9px;">mIoU</div>
-              <div class="nums" style="font-size: 13px; color: var(--ok);">${miou}</div>
-            </div>
-            <div style="text-align: right;">
-              <div class="section-label" style="font-size: 9px;">Det conf</div>
-              <div class="nums ${confCls ? 'conf ' + confCls : ''}" style="font-size: 13px; display: inline-block;">${conf}</div>
-            </div>
-            <span class="pill ${statusCls}">${statusText}</span>
-          </div>
-        `;
-      }).join('');
+      statusEl.textContent = 'IDLE';
+      statusEl.className = 'pill';
     }
-  } catch (e) {}
+    document.getElementById('stopBtn').disabled = !running;
 
-  try {
-    const t = await api.get('/api/train/progress');
-    if (t && t.running) {
-      document.getElementById('trainStatus').textContent = `● EPOCH ${t.current_epoch}/${t.total_epochs}`;
-      document.getElementById('trainStatus').className = 'pill pill-warn';
-      document.getElementById('stopBtn').disabled = false;
-      const pct = Math.round(100 * (t.current_epoch || 0) / (t.total_epochs || 1));
+    if (running || status === 'done' || (t.history && t.history.length > 0)) {
+      const eta = t.eta_sec || 0;
+      const etaStr = eta > 60 ? `${Math.round(eta / 60)}m` : `${Math.round(eta)}s`;
       document.getElementById('progArea').innerHTML = `
-        <div class="grid grid-4" style="gap: 8px; margin-bottom: 14px;">
-          <div class="stat"><div class="stat-label">Train loss</div><div class="stat-value">${(t.train_loss || 0).toFixed(3)}</div></div>
-          <div class="stat"><div class="stat-label">Val mIoU</div><div class="stat-value ok">${(t.val_miou || 0).toFixed(3)}</div></div>
-          <div class="stat"><div class="stat-label">Det conf</div><div class="stat-value">${(t.val_conf || 0).toFixed(2)}</div></div>
-          <div class="stat"><div class="stat-label">ETA</div><div class="stat-value">${fmt.sec(t.eta_sec || 0)}</div></div>
+        <div class="grid grid-4" style="gap: 0; border: 1px solid var(--edge); margin-bottom: 12px;">
+          <div class="stat" style="border-right: 1px solid var(--edge);">
+            <div class="stat-label">Train loss</div>
+            <div class="stat-value">${(t.train_loss || 0).toFixed(3)}</div>
+          </div>
+          <div class="stat" style="border-right: 1px solid var(--edge);">
+            <div class="stat-label">Road IoU</div>
+            <div class="stat-value ok">${(t.val_road_iou || 0).toFixed(3)}</div>
+          </div>
+          <div class="stat" style="border-right: 1px solid var(--edge);">
+            <div class="stat-label">Det conf</div>
+            <div class="stat-value">${(t.val_det_conf || 0).toFixed(2)}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">${running ? 'ETA' : 'Best'}</div>
+            <div class="stat-value">${running ? etaStr : (t.best_road_iou || 0).toFixed(3)}</div>
+          </div>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-          <span class="section-label" style="font-size: 10px;">Epoch ${t.current_epoch} of ${t.total_epochs}</span>
+          <span class="section-label" style="font-size: 10px;">Epoch ${epoch} of ${totalEp}</span>
           <span class="nums" style="font-size: 10px; color: var(--ink-faint);">${pct}%</span>
         </div>
         <div class="progress warn"><div style="width: ${pct}%"></div></div>
       `;
+      if (t.history && t.history.length > 0) renderChart(t.history);
     } else {
-      document.getElementById('trainStatus').textContent = 'IDLE';
-      document.getElementById('trainStatus').className = 'pill';
-      document.getElementById('stopBtn').disabled = true;
-      document.getElementById('progArea').innerHTML = '<div style="text-align: center; color: var(--ink-faint); font-size: 12px; padding: 40px; font-style: italic;">No active training run.</div>';
+      document.getElementById('progArea').innerHTML =
+        '<div style="text-align: center; color: var(--ink-faint); font-size: 12px; padding: 40px; font-style: italic;">No active training run. Click START TRAINING to begin.</div>';
     }
-  } catch (e) {}
+  } catch(e) {}
+}
+
+function renderChart(history) {
+  const c = document.getElementById('chart');
+  const box = document.getElementById('chartArea');
+  const dpr = window.devicePixelRatio || 1;
+  const W = box.clientWidth * dpr;
+  const H = box.clientHeight * dpr;
+  c.width = W; c.height = H;
+  c.style.width = box.clientWidth + 'px'; c.style.height = box.clientHeight + 'px';
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  if (!history.length) return;
+  const pad = 34 * dpr;
+  const innerW = W - pad * 2;
+  const innerH = H - pad * 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad + (innerH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
+  }
+  const n = history.length;
+  const x = (i) => pad + (i / Math.max(n - 1, 1)) * innerW;
+  const drawSeries = (values, color, lw) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    values.forEach((v, i) => {
+      const y = pad + innerH - (v * innerH);
+      if (i === 0) ctx.moveTo(x(i), y);
+      else ctx.lineTo(x(i), y);
+    });
+    ctx.stroke();
+  };
+  drawSeries(history.map(h => h.val_miou_road || h.val_road_iou || 0), '#7dd3fc', 2 * dpr);
+  drawSeries(history.map(h => h.mean_det_conf || h.val_det_conf || 0), '#fbbf24', 2 * dpr);
+  const losses = history.map(h => h.loss || h.train_loss || 0);
+  const maxL = Math.max(...losses, 0.01);
+  drawSeries(losses.map(v => v / maxL), '#f87171', 1.5 * dpr);
+
+  ctx.fillStyle = '#7dd3fc';
+  ctx.font = `${10 * dpr}px JetBrains Mono`;
+  ctx.fillText('road IoU', pad + 4, pad + 12 * dpr);
+  ctx.fillStyle = '#fbbf24';
+  ctx.fillText('det conf', pad + 80 * dpr, pad + 12 * dpr);
+  ctx.fillStyle = '#f87171';
+  ctx.fillText('loss (norm)', pad + 160 * dpr, pad + 12 * dpr);
+  ctx.fillStyle = '#94a3b8';
+  ctx.fillText('1.0', 4, pad + 10);
+  ctx.fillText('0.0', 4, H - pad + 4);
+  ctx.fillText(`epoch 1`, pad, H - 4);
+  ctx.fillText(`epoch ${n}`, W - pad - 50 * dpr, H - 4);
+}
+
+async function refreshLog() {
+  try {
+    const r = await api.get('/api/perception/log');
+    const lb = document.getElementById('logBox');
+    lb.textContent = r.log || '(empty)';
+    lb.scrollTop = lb.scrollHeight;
+  } catch(e) {}
 }
 
 document.getElementById('trainBtn').addEventListener('click', async () => {
   try {
-    await api.post('/api/train/start', {
-      round_num: parseInt(document.getElementById('cRound').value),
+    await api.post('/api/perception/train', {
       epochs: parseInt(document.getElementById('cEpochs').value),
       batch_size: parseInt(document.getElementById('cBatch').value),
       lr: parseFloat(document.getElementById('cLR').value),
+      workers: parseInt(document.getElementById('cWorkers').value),
       resume: document.getElementById('cResume').value || null,
     });
-    refresh();
-  } catch (e) { alert('Start failed: ' + e.message); }
+    refreshProgress();
+  } catch(e) { alert('Start failed: ' + e.message); }
 });
 document.getElementById('stopBtn').addEventListener('click', async () => {
-  try { await api.post('/api/train/cancel'); refresh(); } catch (e) {}
+  if (!confirm('Stop training? Best checkpoint so far is kept.')) return;
+  try { await api.post('/api/perception/cancel'); refreshProgress(); } catch(e) {}
 });
+document.getElementById('refreshLog').addEventListener('click', refreshLog);
 
-setInterval(refresh, 2500); refresh();
+function tick() { refreshStats(); refreshProgress(); }
+tick();
+setInterval(tick, 2000);
+setInterval(refreshLog, 5000);
+refreshLog();
 </script>
 </body>
 </html>

@@ -174,9 +174,9 @@ def det_loss(preds: list[torch.Tensor], targets: list[dict]) -> torch.Tensor:
         reg = pred[:, 1:5]       # (B, 4, H, W) — l, r, t, b
         cls = pred[:, 5:]        # (B, NC, H, W)
 
-        # Build target tensors
-        obj_tgt = torch.zeros_like(obj)
-        reg_tgt = torch.zeros_like(reg)
+        # Build target tensors — always float32 (targets shouldn't be half)
+        obj_tgt = torch.zeros_like(obj, dtype=torch.float32)
+        reg_tgt = torch.zeros_like(reg, dtype=torch.float32)
         cls_tgt = torch.full((Bp, Hp, Wp), -1, dtype=torch.long, device=device)
 
         # Grid of cell centers in pixel space
@@ -202,19 +202,24 @@ def det_loss(preds: list[torch.Tensor], targets: list[dict]) -> torch.Tensor:
                 reg_tgt[b, 3][inside] = (y2 - grid_y[inside]) / stride
                 cls_tgt[b][inside] = labels[bi]
 
+        # Cast preds to float32 to match float32 targets (AMP safety)
+        obj_f = obj.float()
+        reg_f = reg.float()
+        cls_f = cls.float()
+
         # Objectness loss on all cells
-        total_obj = total_obj + F.binary_cross_entropy_with_logits(obj, obj_tgt)
+        total_obj = total_obj + F.binary_cross_entropy_with_logits(obj_f, obj_tgt)
 
         # Reg + cls only on positive cells
         pos_mask = obj_tgt > 0.5
         if pos_mask.sum() > 0:
             total_reg = total_reg + F.l1_loss(
-                reg.permute(0, 2, 3, 1)[pos_mask],
+                reg_f.permute(0, 2, 3, 1)[pos_mask],
                 reg_tgt.permute(0, 2, 3, 1)[pos_mask],
             )
             valid = cls_tgt >= 0
             if valid.sum() > 0:
-                cls_flat = cls.permute(0, 2, 3, 1)[valid]
+                cls_flat = cls_f.permute(0, 2, 3, 1)[valid]
                 tgt_flat = cls_tgt[valid]
                 total_cls = total_cls + F.cross_entropy(cls_flat, tgt_flat)
             pos_count += int(pos_mask.sum().item())
@@ -232,7 +237,11 @@ def decode_segmentation(seg_logits: torch.Tensor) -> torch.Tensor:
 
 @torch.no_grad()
 def decode_detection(preds: list[torch.Tensor], conf_thr: float = 0.3,
-                     iou_thr: float = 0.5) -> list[list[dict]]:
+                     iou_thr: float = 0.5, conf_threshold: float = None,
+                     iou_threshold: float = None) -> list[list[dict]]:
+    # Accept both old and new parameter names
+    if conf_threshold is not None: conf_thr = conf_threshold
+    if iou_threshold is not None: iou_thr = iou_threshold
     """
     Returns list of length B, each a list of {x1,y1,x2,y2,score,cls} in pixel coords.
     """

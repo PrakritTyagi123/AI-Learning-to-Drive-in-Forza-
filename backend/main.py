@@ -9,7 +9,6 @@ Routes are organized by subsystem:
   /api/ingest/*      — video / YouTube ingestion    (video_ingester.py)
   /api/label/*       — labeling tool backend        (labeling_backend.py)
   /api/telemetry/*   — Forza UDP telemetry          (telemetry_listener.py)
-  /api/train/*       — training control             (training_runner.py)
   /api/system/*      — stats, health, settings
 
 Static pages:
@@ -17,7 +16,6 @@ Static pages:
   /record     — recording panel
   /ingest     — ingest panel
   /label      — labeling tool
-  /train      — training + active-learning
   /telemetry  — live telemetry dashboard
   /drive      — autonomous driving (placeholder)
   /settings   — app configuration
@@ -42,7 +40,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backend.database import init_db, overall_stats, DB_PATH
 from backend import recorder, video_ingester, labeling_backend
-from backend import telemetry_listener, training_runner
+from backend import telemetry_listener, perception_runner
 
 
 app = FastAPI(title="ForzaTek AI", version="1.0")
@@ -63,7 +61,7 @@ recorder.register_routes(app)
 video_ingester.register_routes(app)
 labeling_backend.register_routes(app)
 telemetry_listener.register_routes(app)
-training_runner.register_routes(app)
+perception_runner.register_routes(app)
 
 # Start the UDP telemetry listener in a daemon thread so /api/telemetry/live
 # has data as soon as Forza sends a packet.
@@ -157,6 +155,14 @@ def label_page():
 @app.get("/train")
 def train_page():
     return _page("train.html")
+
+
+@app.get("/test")
+def test_page():
+    return _page("test.html")
+
+
+
 
 
 @app.get("/telemetry")

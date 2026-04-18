@@ -207,9 +207,34 @@
       </div>
 
       <div class="side-section">
-        <button class="btn btn-ok btn-block" id="submitBtn">SAVE & NEXT</button>
-        <button class="btn btn-block" id="skipBtn" style="margin-top: 6px;">SKIP</button>
-        <button class="btn btn-accent btn-block" id="prelabelBtn" style="margin-top: 6px;">PRE-LABEL</button>
+        <div id="reviewActions" style="display:none; margin-bottom:10px;">
+          <div class="section-label" style="margin-bottom:6px; color:var(--warn);">REVIEW MODE &mdash; AI PROPOSED</div>
+          <button class="btn btn-ok btn-block" id="acceptBtn" style="font-size:15px;padding:10px;">&#10003; ACCEPT &nbsp;<span style="opacity:0.5;font-size:11px;">A</span></button>
+          <button class="btn btn-danger btn-block" id="rejectBtn" style="margin-top:6px;font-size:15px;padding:10px;">&#10007; REJECT &nbsp;<span style="opacity:0.5;font-size:11px;">R</span></button>
+          <div style="border-bottom:1px solid var(--edge);margin:10px 0;"></div>
+        </div>
+        <button class="btn btn-ok btn-block" id="submitBtn">SAVE &amp; NEXT</button>
+        <button class="btn btn-block" id="skipBtn" style="margin-top:6px;">SKIP</button>
+        <button class="btn btn-accent btn-block" id="prelabelBtn" style="margin-top:6px;">PRE-LABEL THIS</button>
+        <div style="border-top:1px solid var(--edge);margin-top:12px;padding-top:12px;">
+          <div class="section-label" style="margin-bottom:6px;">Bulk auto-label</div>
+          <button class="btn btn-accent btn-block" id="prelabelAllBtn">&#9654; PRE-LABEL UNLABELED</button>
+          <button class="btn btn-block" id="rerunAllBtn" style="margin-top:6px;">&#8635; RE-RUN ON ALL FRAMES</button>
+          <div style="border-top:1px solid var(--edge); margin-top:10px; padding-top:10px;">
+            <div class="section-label" style="margin-bottom:6px; color: var(--ok);">Auto-accept high confidence</div>
+            <div style="font-size:10px; color:var(--ink-faint); margin-bottom:6px; line-height:1.4;">
+              Accepts clear, confident proposals as labels automatically. You review only the rest.
+            </div>
+            <div class="field" style="margin-bottom:6px;">
+              <label style="font-size:10px;">Threshold <span id="thrVal" style="color:var(--ok)">0.70</span></label>
+              <input type="range" id="autoThr" min="0.5" max="0.95" step="0.05" value="0.7" style="width:100%;">
+            </div>
+            <button class="btn btn-ok btn-block" id="autoAcceptBtn">&#10003; AUTO-ACCEPT ALL CONFIDENT</button>
+            <div id="autoStatus" style="font-size:10px; color:var(--ink-faint); margin-top:6px; display:none;"></div>
+          </div>
+          <div id="bulkStatus" style="font-size:10px;color:var(--ink-faint);margin-top:6px;line-height:1.6;display:none;"></div>
+          <button class="btn btn-danger btn-block" id="prelabelCancelBtn" style="margin-top:6px;display:none;">&#9632; CANCEL</button>
+        </div>
       </div>
     </div>
 
@@ -270,6 +295,7 @@ async function loadFrame(id, fr, labels, proposals) {
   state.existingLabels = labels || {};
   state.undoStack = []; state.boxes = []; state.selectedBox = -1;
   state.isReview = Object.keys(state.proposals).length > 0 && Object.keys(state.existingLabels).length === 0;
+  const _ra = document.getElementById('reviewActions'); if (_ra) _ra.style.display = state.isReview ? 'block' : 'none';
 
   document.getElementById('iId').textContent = id;
   document.getElementById('iSource').textContent = fr.source_type;
@@ -495,6 +521,101 @@ async function prelabel() {
 document.getElementById('submitBtn').onclick = () => submit();
 document.getElementById('skipBtn').onclick = skip;
 document.getElementById('prelabelBtn').onclick = prelabel;
+document.getElementById('acceptBtn').onclick = () => submit('proposed_accepted');
+document.getElementById('rejectBtn').onclick = () => { segCtx.clearRect(0,0,state.dispW,state.dispH); state.boxes=[]; renderBoxes(); skip(); };
+
+let _bulkTimer = null;
+function startBulkPoll() {
+  if (_bulkTimer) clearInterval(_bulkTimer);
+  _bulkTimer = setInterval(async () => {
+    try {
+      const s = await api.get('/api/label/prelabel_all/status');
+      const pct = s.total > 0 ? Math.round(100 * s.done / s.total) : 0;
+      document.getElementById('bulkStatus').style.display = 'block';
+      document.getElementById('bulkStatus').innerHTML =
+        s.done + ' / ' + s.total + ' frames · ' + pct + '%' +
+        (s.failed ? ' · ' + s.failed + ' failed' : '') +
+        (s.error ? '<br><span style="color:var(--danger)">' + s.error + '</span>' : '');
+      if (!s.running) {
+        clearInterval(_bulkTimer);
+        document.getElementById('prelabelAllBtn').disabled = false;
+        document.getElementById('prelabelAllBtn').textContent = '▶ PRE-LABEL UNLABELED';
+        document.getElementById('rerunAllBtn').disabled = false;
+        document.getElementById('rerunAllBtn').textContent = '↻ RE-RUN ON ALL FRAMES';
+        document.getElementById('prelabelCancelBtn').style.display = 'none';
+        refreshProgress();
+        loadNext();
+      }
+    } catch(e) {}
+  }, 1000);
+}
+async function startBulk(includeProposed) {
+  const btn1 = document.getElementById('prelabelAllBtn');
+  const btn2 = document.getElementById('rerunAllBtn');
+  btn1.disabled = true; btn2.disabled = true;
+  btn1.textContent = includeProposed ? 'RE-RUN RUNNING…' : 'RUNNING…';
+  btn2.textContent = includeProposed ? 'RUNNING…' : '↻ RE-RUN ON ALL FRAMES';
+  try {
+    const r = await api.post('/api/label/prelabel_all', { include_proposed: !!includeProposed });
+    if (!r.ok) { alert('Already running'); return; }
+    document.getElementById('bulkStatus').style.display = 'block';
+    document.getElementById('prelabelCancelBtn').style.display = 'block';
+    startBulkPoll();
+  } catch(e) { alert('Failed: ' + e.message); btn1.disabled = false; btn2.disabled = false; }
+}
+document.getElementById('prelabelAllBtn').onclick = () => startBulk(false);
+document.getElementById('rerunAllBtn').onclick = async () => {
+  if (!confirm('Re-run pre-labeling on ALL frames (including already proposed)? This overwrites existing proposals but keeps anything you already accepted/labeled.')) return;
+  await startBulk(true);
+};
+document.getElementById('prelabelCancelBtn').onclick = async () => { await api.post('/api/label/prelabel_all/cancel'); };
+
+// Auto-accept high-confidence proposals
+document.getElementById('autoThr').addEventListener('input', e => {
+  document.getElementById('thrVal').textContent = parseFloat(e.target.value).toFixed(2);
+});
+let _autoTimer = null;
+function startAutoPoll() {
+  if (_autoTimer) clearInterval(_autoTimer);
+  _autoTimer = setInterval(async () => {
+    try {
+      const s = await api.get('/api/label/auto_accept/status');
+      const el = document.getElementById('autoStatus');
+      el.style.display = 'block';
+      const pct = s.total > 0 ? Math.round(100 * s.done / s.total) : 0;
+      el.innerHTML = `${s.done} / ${s.total} &middot; ${pct}%<br><span style="color:var(--ok)">accepted: ${s.accepted}</span> &middot; <span style="color:var(--ink-dim)">needs review: ${s.skipped}</span>` + (s.error ? `<br><span style="color:var(--danger)">${s.error}</span>` : '');
+      if (!s.running) {
+        clearInterval(_autoTimer); _autoTimer = null;
+        document.getElementById('autoAcceptBtn').disabled = false;
+        document.getElementById('autoAcceptBtn').textContent = '✓ AUTO-ACCEPT ALL CONFIDENT';
+        refreshProgress(); loadNext();
+      }
+    } catch(e) {}
+  }, 1500);
+}
+document.getElementById('autoAcceptBtn').onclick = async () => {
+  const thr = parseFloat(document.getElementById('autoThr').value);
+  if (!confirm(`Auto-accept all proposals with score >= ${thr.toFixed(2)}? \n\nLower-confidence ones stay as proposals for you to review.`)) return;
+  const btn = document.getElementById('autoAcceptBtn');
+  btn.disabled = true; btn.textContent = 'RUNNING…';
+  try {
+    const r = await api.post('/api/label/auto_accept', { threshold: thr });
+    if (!r.ok) { alert('Already running'); btn.disabled = false; return; }
+    startAutoPoll();
+  } catch(e) { alert('Failed: ' + e.message); btn.disabled = false; }
+};
+
+// Resume auto-accept poll if running when tab was switched
+(async () => {
+  try {
+    const s = await api.get('/api/label/auto_accept/status');
+    if (s.running) {
+      document.getElementById('autoAcceptBtn').disabled = true;
+      document.getElementById('autoAcceptBtn').textContent = 'RUNNING…';
+      startAutoPoll();
+    }
+  } catch(e) {}
+})();
 
 window.addEventListener('keydown', e => {
   if (e.ctrlKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
@@ -503,7 +624,7 @@ window.addEventListener('keydown', e => {
   if (k === ' ') { e.preventDefault(); submit(); }
   else if (k === 's') skip();
   else if (k === 'a' && state.isReview) submit('proposed_accepted');
-  else if (k === 'r' && state.isReview) { segCtx.clearRect(0,0,state.dispW,state.dispH); state.boxes = []; renderBoxes(); }
+  else if (k === 'r' && state.isReview) { segCtx.clearRect(0,0,state.dispW,state.dispH); state.boxes=[]; renderBoxes(); skip(); }
   else if (k === 'p') prelabel();
   else if (k === 'tab') { e.preventDefault(); setMode(state.mode === 'seg' ? 'det' : 'seg'); }
   else if (['0','1','2','3'].includes(k)) {
@@ -525,6 +646,23 @@ async function refreshProgress() {
 }
 refreshProgress(); loadNext();
 setInterval(refreshProgress, 4000);
+(async () => {
+  try {
+    const s = await api.get('/api/label/prelabel_all/status');
+    if (s.running) {
+      document.getElementById('bulkStatus').style.display = 'block';
+      document.getElementById('prelabelCancelBtn').style.display = 'block';
+      document.getElementById('prelabelAllBtn').disabled = true;
+      document.getElementById('rerunAllBtn').disabled = true;
+      document.getElementById('prelabelAllBtn').textContent = 'RUNNING…';
+      startBulkPoll();
+    } else if (s.total > 0) {
+      const pct = Math.round(100 * s.done / s.total);
+      document.getElementById('bulkStatus').style.display = 'block';
+      document.getElementById('bulkStatus').innerHTML = s.done + ' / ' + s.total + ' frames · ' + pct + '%';
+    }
+  } catch(e) {}
+})();
 
 window.addEventListener('resize', () => {
   if (state.frameId !== null) {

@@ -60,8 +60,9 @@
     </div>
 
     <div id="ytPanel" class="field" style="margin-bottom: 12px;">
-      <label>URL</label>
-      <input type="text" class="input" id="ytUrl" placeholder="https://youtube.com/watch?v=...">
+      <label>YouTube URL(s) &mdash; one per line</label>
+      <textarea class="input" id="ytUrl" rows="4" placeholder="https://youtube.com/watch?v=...&#10;https://youtube.com/watch?v=...&#10;https://youtu.be/..." style="font-family: 'JetBrains Mono', monospace; font-size: 12px; resize: vertical;"></textarea>
+      <div id="ytStatus" style="font-size: 11px; color: var(--ink-faint); margin-top: 6px; line-height: 1.6; display: none;"></div>
     </div>
     <div id="filePanel" class="field" style="margin-bottom: 12px; display: none;">
       <label>Absolute path to video file</label>
@@ -176,20 +177,103 @@ document.getElementById('tabYT').addEventListener('click',   () => setTab('yt'))
 document.getElementById('tabFile').addEventListener('click', () => setTab('file'));
 
 document.getElementById('registerBtn').addEventListener('click', async () => {
-  const kind = activeKind === 'yt' ? 'youtube_url' : 'video_file';
-  const uri = activeKind === 'yt' ? document.getElementById('ytUrl').value : document.getElementById('filePath').value;
-  if (!uri.trim()) { alert('URL or path required'); return; }
+  if (activeKind === 'yt') {
+    await registerYouTubeBatch();
+  } else {
+    await registerLocalFile();
+  }
+});
+
+async function registerLocalFile() {
+  const uri = document.getElementById('filePath').value.trim();
+  if (!uri) { alert('Path required'); return; }
   try {
     await api.post('/api/ingest/register', {
-      kind, uri,
+      kind: 'video_file', uri,
       game_version: document.getElementById('gameVer').value,
       biome_override: document.getElementById('biome').value || null,
     });
-    document.getElementById('ytUrl').value = '';
     document.getElementById('filePath').value = '';
     refresh();
   } catch (e) { alert('Register failed: ' + e.message); }
-});
+}
+
+async function registerYouTubeBatch() {
+  const raw = document.getElementById('ytUrl').value.trim();
+  if (!raw) { alert('At least one URL required'); return; }
+  const urls = raw.split(/[\r\n]+/).map(s => s.trim()).filter(Boolean);
+  if (!urls.length) { alert('No valid URLs'); return; }
+
+  const gameVer = document.getElementById('gameVer').value;
+  const biomeOv = document.getElementById('biome').value || null;
+
+  try {
+    await api.post('/api/ingest/download_queue', {
+      urls, game_version: gameVer, biome_override: biomeOv
+    });
+    document.getElementById('ytUrl').value = '';
+    startQueuePoll();
+  } catch (e) {
+    alert('Failed to queue: ' + e.message);
+  }
+}
+
+let _queuePollTimer = null;
+function startQueuePoll() {
+  if (_queuePollTimer) return;
+  _queuePollTimer = setInterval(updateQueueStatus, 1500);
+  updateQueueStatus();
+}
+function stopQueuePoll() {
+  if (_queuePollTimer) { clearInterval(_queuePollTimer); _queuePollTimer = null; }
+}
+
+async function updateQueueStatus() {
+  try {
+    const q = await api.get('/api/ingest/download_queue');
+    const statusEl = document.getElementById('ytStatus');
+
+    if (!q.items || q.items.length === 0) {
+      statusEl.style.display = 'none';
+      stopQueuePoll();
+      refresh();
+      return;
+    }
+
+    statusEl.style.display = 'block';
+    let html = `<div style="margin-bottom:6px; color: var(--ink);"><b>Download queue</b> &mdash; ${q.done} done, ${q.active} active, ${q.pending} pending${q.failed ? ', <span style="color:var(--danger)">' + q.failed + ' failed</span>' : ''}</div>`;
+    for (const it of q.items) {
+      let color = 'var(--ink-faint)', icon = '&nbsp;&bull;&nbsp;';
+      if (it.status === 'downloading') { color = 'var(--warn)'; icon = '&#9203;'; }
+      else if (it.status === 'done')   { color = 'var(--ok)'; icon = '&#10003;'; }
+      else if (it.status === 'failed') { color = 'var(--danger)'; icon = '&#10007;'; }
+      else if (it.status === 'pending'){ color = 'var(--ink-dim)'; icon = '&hellip;'; }
+      html += `<div style="color:${color}; font-size:11px; margin:2px 0;">${icon} ${it.status.toUpperCase()} &middot; ${it.url.slice(0, 70)}${it.error ? ' &mdash; <span style="color:var(--danger)">' + it.error + '</span>' : ''}</div>`;
+    }
+    if (!q.running && (q.done + q.failed) > 0) {
+      html += '<button class="btn btn-sm" style="margin-top:8px;" onclick="clearQueue()">Clear completed</button>';
+      stopQueuePoll();
+      refresh();
+    } else {
+      html += '<button class="btn btn-sm btn-danger" style="margin-top:8px;" onclick="cancelQueue()">Cancel pending</button>';
+    }
+    statusEl.innerHTML = html;
+  } catch (e) {}
+}
+
+async function clearQueue() {
+  await api.post('/api/ingest/download_queue/clear');
+  updateQueueStatus();
+}
+async function cancelQueue() {
+  await api.post('/api/ingest/download_queue/cancel');
+  updateQueueStatus();
+}
+window.clearQueue = clearQueue;
+window.cancelQueue = cancelQueue;
+
+// Start polling on page load in case there's a queue from before
+startQueuePoll();
 
 let currentSourceId = null;
 let currentMaskRects = [];

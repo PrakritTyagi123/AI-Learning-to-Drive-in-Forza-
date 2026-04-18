@@ -26,6 +26,22 @@ from typing import Optional
 import cv2
 import numpy as np
 
+# Video decoding backends (in priority order)
+# 1. PyAV with NVDEC hardware decoder (NVIDIA GPU, fastest on Windows)
+# 2. decord with CPU threads (fast CPU multi-threaded fallback)
+# 3. cv2.VideoCapture (last resort)
+try:
+    import av
+    PYAV_AVAILABLE = True
+except Exception:
+    PYAV_AVAILABLE = False
+
+try:
+    import decord
+    DECORD_AVAILABLE = True
+except Exception:
+    DECORD_AVAILABLE = False
+
 from backend.database import DB_PATH, init_db, write_conn, read_conn
 from backend.recorder import (
     compute_phash, hamming_distance,
@@ -236,19 +252,85 @@ class VideoIngester:
                 if not video_path.exists():
                     raise FileNotFoundError(f"video file not found: {uri}")
 
-            # Step 2: open with OpenCV
-            cap = cv2.VideoCapture(str(video_path))
-            if not cap.isOpened():
-                raise RuntimeError("cv2 could not open the video")
-            fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            job.total_duration = total_frames / fps
+            # Step 2: open the video with the fastest available backend
+            backend = None           # "pyav_gpu" | "pyav_cpu" | "decord" | "cv2"
+            container = None         # for pyav
+            stream = None             # for pyav
+            vr = None                 # for decord
+            cap = None                # for cv2
 
+            # Try PyAV with NVDEC first (true GPU hardware decode)
+            if PYAV_AVAILABLE:
+                try:
+                    container = av.open(str(video_path), options={
+                        "hwaccel": "cuda",
+                        "hwaccel_output_format": "cuda",
+                    })
+                    stream = container.streams.video[0]
+                    stream.codec_context.options = {"hwaccel": "cuda"}
+                    # Set threading for faster decode
+                    stream.thread_type = "AUTO"
+                    backend = "pyav_gpu"
+                    print(f"[INGEST] Using PyAV with NVDEC (GPU hardware decode) for {video_path.name}")
+                except Exception as e:
+                    print(f"[INGEST] PyAV NVDEC failed ({e}), trying PyAV CPU")
+                    try:
+                        if container is not None:
+                            container.close()
+                    except Exception:
+                        pass
+                    container = None
+                    try:
+                        container = av.open(str(video_path))
+                        stream = container.streams.video[0]
+                        stream.thread_type = "AUTO"
+                        backend = "pyav_cpu"
+                        print(f"[INGEST] Using PyAV with CPU threads for {video_path.name}")
+                    except Exception as e2:
+                        print(f"[INGEST] PyAV CPU also failed ({e2})")
+                        container = None
+                        stream = None
+
+            # Try decord next
+            if backend is None and DECORD_AVAILABLE:
+                try:
+                    vr = decord.VideoReader(str(video_path), ctx=decord.cpu(0), num_threads=4)
+                    backend = "decord"
+                    print(f"[INGEST] Using decord with CPU threads for {video_path.name}")
+                except Exception as e:
+                    print(f"[INGEST] decord failed ({e})")
+                    vr = None
+
+            # Last resort: cv2
+            if backend is None:
+                print(f"[INGEST] Using cv2.VideoCapture (slowest) for {video_path.name}")
+                cap = cv2.VideoCapture(str(video_path))
+                if not cap.isOpened():
+                    raise RuntimeError("cv2 could not open the video")
+                backend = "cv2"
+
+            # Get fps and total_frames based on backend
+            if backend.startswith("pyav"):
+                fps = float(stream.average_rate) if stream.average_rate else 30.0
+                # total_frames may be inaccurate in some containers; duration * fps is more reliable
+                if stream.frames and stream.frames > 0:
+                    total_frames = stream.frames
+                elif stream.duration and stream.time_base:
+                    total_frames = int(float(stream.duration * stream.time_base) * fps)
+                else:
+                    total_frames = 10**9  # sentinel: read until EOF
+            elif backend == "decord":
+                fps = vr.get_avg_fps() or 30.0
+                total_frames = len(vr)
+            else:  # cv2
+                fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+                total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+            job.total_duration = total_frames / fps if fps else 0
             frame_interval = int(round(fps * job.sample_every_sec))
             if frame_interval < 1:
                 frame_interval = 1
 
-            # Update source duration
             with write_conn(self.db_path) as c:
                 c.execute(
                     "UPDATE sources SET duration_sec=?, status='processing' WHERE id=?",
@@ -263,10 +345,52 @@ class VideoIngester:
                 if self._cancel_flag:
                     job.status = "cancelled"
                     break
-                # Seek to next sample frame (faster than reading every frame)
-                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-                ret, frame = cap.read()
-                if not ret:
+
+                if frame_idx >= total_frames:
+                    break
+
+                # Read one frame at frame_idx based on backend
+                frame = None
+                try:
+                    if backend.startswith("pyav"):
+                        # Seek to timestamp
+                        target_ts = int(frame_idx / fps / stream.time_base) if stream.time_base else 0
+                        try:
+                            container.seek(target_ts, backward=True, any_frame=False, stream=stream)
+                        except Exception:
+                            pass
+                        # Decode frames after seek until we find one at/past target
+                        want_pts = frame_idx / fps
+                        got = None
+                        for packet in container.demux(stream):
+                            for f in packet.decode():
+                                if f is None:
+                                    continue
+                                pts = float(f.pts * stream.time_base) if f.pts is not None else 0
+                                if pts >= want_pts - (0.5 / fps):
+                                    got = f
+                                    break
+                            if got is not None:
+                                break
+                        if got is None:
+                            break
+                        # PyAV: convert to ndarray BGR
+                        arr = got.to_ndarray(format="bgr24")
+                        frame = arr
+                    elif backend == "decord":
+                        f = vr[frame_idx]
+                        arr = f.asnumpy() if hasattr(f, "asnumpy") else np.asarray(f)
+                        frame = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
+                    else:  # cv2
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+                        ret, frame = cap.read()
+                        if not ret:
+                            break
+                except Exception as e:
+                    print(f"[INGEST] frame read error at {frame_idx}: {e}")
+                    break
+
+                if frame is None:
                     break
 
                 job.current_video_time = frame_idx / fps
@@ -323,7 +447,13 @@ class VideoIngester:
                 job.frames_accepted += 1
                 frame_idx += frame_interval
 
-            cap.release()
+            try:
+                if backend.startswith("pyav") and container is not None:
+                    container.close()
+                elif backend == "cv2" and cap is not None:
+                    cap.release()
+            except Exception:
+                pass
 
             with write_conn(self.db_path) as c:
                 c.execute(
@@ -348,12 +478,169 @@ class VideoIngester:
 ingester = VideoIngester()
 
 
+
+# ─── Background YouTube download queue ───
+# Instead of blocking HTTP requests for each download, the frontend POSTs a list
+# of URLs and a background worker downloads them one-by-one, updating status as
+# it goes. This way the UI never gets stuck.
+
+import threading as _dl_threading
+
+_dl_queue = []                      # list of {url, status, title, path, error}
+_dl_thread = None
+_dl_lock = _dl_threading.Lock()
+_dl_current = None                  # dict of the item currently downloading (or None)
+_dl_cancel = False
+
+
+def _dl_worker():
+    """Download items from the queue one at a time."""
+    global _dl_current, _dl_cancel
+    while True:
+        with _dl_lock:
+            # find first pending item
+            item = None
+            for it in _dl_queue:
+                if it["status"] == "pending":
+                    item = it
+                    break
+            if item is None or _dl_cancel:
+                _dl_current = None
+                break
+            item["status"] = "downloading"
+            _dl_current = item
+
+        try:
+            path = download_with_ytdlp(item["url"], ingester._download_dir)
+            title = get_video_title(item["url"])
+            with _dl_lock:
+                item["status"] = "done"
+                item["path"] = str(path)
+                item["title"] = title
+
+            # Auto-register as a source
+            try:
+                ingester.register_source(
+                    kind="video_file",
+                    uri=str(path),
+                    game_version=item.get("game_version", "fh4"),
+                    biome_override=item.get("biome_override"),
+                    hud_mask=[],
+                    title=title,
+                )
+            except Exception as reg_e:
+                with _dl_lock:
+                    item["error"] = f"Downloaded but register failed: {reg_e}"
+        except Exception as e:
+            with _dl_lock:
+                item["status"] = "failed"
+                item["error"] = str(e)[:500]
+
+    with _dl_lock:
+        _dl_current = None
+
+
+def _ensure_worker():
+    """Start the worker thread if it isn't already running."""
+    global _dl_thread
+    with _dl_lock:
+        if _dl_thread is None or not _dl_thread.is_alive():
+            _dl_thread = _dl_threading.Thread(target=_dl_worker, daemon=True)
+            _dl_thread.start()
+
+
 def register_routes(app):
     from fastapi import Body, UploadFile, File, HTTPException
 
     @app.get("/api/ingest/sources")
     def _sources():
         return {"sources": ingester.list_sources()}
+
+    @app.post("/api/ingest/download_youtube")
+    def _download_youtube(payload: dict = Body(...)):
+        """Download a YouTube URL now (synchronous) and return the local file path."""
+        url = (payload.get("url") or "").strip()
+        if not url:
+            raise HTTPException(400, "url required")
+        try:
+            path = download_with_ytdlp(url, ingester._download_dir)
+            return {"ok": True, "path": str(path), "title": get_video_title(url)}
+        except Exception as e:
+            raise HTTPException(500, f"Download failed: {e}")
+
+    @app.post("/api/ingest/download_queue")
+    def _download_queue(payload: dict = Body(...)):
+        """Queue URLs for background download. Returns immediately."""
+        urls = payload.get("urls") or []
+        if isinstance(urls, str):
+            urls = [u.strip() for u in urls.splitlines() if u.strip()]
+        if not urls:
+            raise HTTPException(400, "no urls provided")
+        game_version = payload.get("game_version", "fh4")
+        biome_override = payload.get("biome_override")
+        global _dl_cancel
+        with _dl_lock:
+            _dl_cancel = False
+            for url in urls:
+                # Skip duplicates already in queue or done
+                if any(it["url"] == url for it in _dl_queue):
+                    continue
+                _dl_queue.append({
+                    "url": url,
+                    "status": "pending",
+                    "title": "",
+                    "path": "",
+                    "error": "",
+                    "game_version": game_version,
+                    "biome_override": biome_override,
+                })
+        _ensure_worker()
+        return {"ok": True, "queued": len(urls)}
+
+    @app.get("/api/ingest/download_queue")
+    def _download_queue_status():
+        """Return the current state of the queue."""
+        with _dl_lock:
+            items = [
+                {
+                    "url": it["url"],
+                    "status": it["status"],
+                    "title": it.get("title", ""),
+                    "path": it.get("path", ""),
+                    "error": it.get("error", ""),
+                } for it in _dl_queue
+            ]
+        pending  = sum(1 for it in items if it["status"] == "pending")
+        active   = sum(1 for it in items if it["status"] == "downloading")
+        done     = sum(1 for it in items if it["status"] == "done")
+        failed   = sum(1 for it in items if it["status"] == "failed")
+        return {
+            "items": items,
+            "pending": pending,
+            "active": active,
+            "done": done,
+            "failed": failed,
+            "running": active > 0 or pending > 0,
+        }
+
+    @app.post("/api/ingest/download_queue/clear")
+    def _download_queue_clear():
+        """Clear completed/failed entries from the queue."""
+        with _dl_lock:
+            _dl_queue[:] = [it for it in _dl_queue if it["status"] in ("pending", "downloading")]
+        return {"ok": True}
+
+    @app.post("/api/ingest/download_queue/cancel")
+    def _download_queue_cancel():
+        """Cancel any pending downloads (doesn't interrupt the active one)."""
+        global _dl_cancel
+        with _dl_lock:
+            _dl_cancel = True
+            for it in _dl_queue:
+                if it["status"] == "pending":
+                    it["status"] = "failed"
+                    it["error"] = "cancelled"
+        return {"ok": True}
 
     @app.post("/api/ingest/register")
     def _register(payload: dict = Body(...)):
@@ -416,19 +703,39 @@ def register_routes(app):
 
     @app.post("/api/ingest/probe_video")
     def _probe(payload: dict = Body(...)):
-        """Open a video and return first-frame thumbnail + dims. For HUD mask editor."""
-        path = payload.get("uri")
-        if not path or not Path(path).exists():
-            raise HTTPException(404, "file not found")
-        cap = cv2.VideoCapture(path)
+        """Open a video and return a thumbnail + dims for the HUD mask editor.
+        Seeks to ~10% into the video to avoid black intro frames."""
+        import base64
+        path = (payload.get("uri") or "").strip()
+        if not path:
+            raise HTTPException(400, "uri is empty")
+        resolved = Path(path.replace("\\", "/"))
+        if not resolved.exists():
+            resolved = Path(path)
+        if not resolved.exists():
+            raise HTTPException(404, f"File not found: {path!r}")
+        cap = cv2.VideoCapture(str(resolved).replace("\\", "/"))
         if not cap.isOpened():
-            raise HTTPException(400, "cannot open video")
+            cap = cv2.VideoCapture(str(resolved))
+        if not cap.isOpened():
+            raise HTTPException(400, f"OpenCV cannot open: {resolved}")
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
+        # Seek to 10% to skip black intros
+        cap.set(cv2.CAP_PROP_POS_FRAMES, max(1, int(total_frames * 0.10)))
         ret, frame = cap.read()
+        # If still black, try other positions
+        if not ret or (frame is not None and frame.mean() < 10):
+            for pct in (0.20, 0.30, 0.50, 0.05):
+                cap.set(cv2.CAP_PROP_POS_FRAMES, max(1, int(total_frames * pct)))
+                ret, frame = cap.read()
+                if ret and frame.mean() >= 10:
+                    break
         cap.release()
         if not ret:
-            raise HTTPException(400, "cannot read frame")
+            raise HTTPException(400, "Could not read any frame")
         ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
-        import base64
+        if not ok:
+            raise HTTPException(500, "Failed to encode thumbnail")
         return {
             "width": frame.shape[1],
             "height": frame.shape[0],

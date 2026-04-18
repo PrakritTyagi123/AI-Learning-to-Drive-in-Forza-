@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ForzaTek — Test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js"></script>
+<style>
+  .frame-box {
+    background: #000;
+    border: 1px solid var(--edge);
+    aspect-ratio: 16/9;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .frame-box img { width: 100%; height: 100%; object-fit: contain; }
+  .frame-box .label {
+    position: absolute;
+    top: 8px; left: 8px;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    letter-spacing: 0.1em;
+    border-radius: 2px;
+  }
+  .frame-box.ok .label { background: rgba(16,185,129,0.85); }
+  .frame-box.warn .label { background: rgba(245,158,11,0.85); }
+  .frame-box.danger .label { background: rgba(239,68,68,0.85); }
+</style>
+</head>
+<body>
+
+<main class="page">
+
+  <header class="page-header">
+    <div>
+      <div class="crumb">Model / test</div>
+      <h1>Perception test</h1>
+    </div>
+    <div class="pills">
+      <span class="pill" id="modelPill">NO MODEL</span>
+      <span class="pill" id="frameIdPill">FRAME —</span>
+    </div>
+  </header>
+
+  <div class="panel" style="margin-bottom: 10px;">
+    <div class="panel-header">
+      <div class="section-label">Controls</div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-accent" id="prevBtn">&larr; PREV</button>
+        <button class="btn btn-accent" id="randomBtn">RANDOM</button>
+        <button class="btn btn-accent" id="nextBtn">NEXT &rarr;</button>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns: 140px 1fr; gap: 12px; align-items:center; margin-top: 12px;">
+      <label style="font-size:11px;color:var(--ink-faint);">Specific frame ID</label>
+      <div style="display:flex; gap:8px;">
+        <input type="number" class="input" id="fidInput" placeholder="123" style="flex:1;">
+        <button class="btn" id="goBtn">GO</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-3" style="margin-bottom: 10px; gap: 10px;">
+    <div>
+      <div class="section-label" style="margin-bottom: 6px;">Original frame</div>
+      <div class="frame-box" id="origBox">
+        <div class="label">ORIGINAL</div>
+        <img id="origImg" style="display:none;">
+        <div style="color:var(--ink-faint); font-size:11px;">&mdash;</div>
+      </div>
+    </div>
+    <div>
+      <div class="section-label" style="margin-bottom: 6px;">Ground truth (labels)</div>
+      <div class="frame-box ok" id="gtBox">
+        <div class="label">GROUND TRUTH</div>
+        <img id="gtImg" style="display:none;">
+        <div style="color:var(--ink-faint); font-size:11px;">&mdash;</div>
+      </div>
+    </div>
+    <div>
+      <div class="section-label" style="margin-bottom: 6px;">Model prediction</div>
+      <div class="frame-box warn" id="predBox">
+        <div class="label">PREDICTION</div>
+        <img id="predImg" style="display:none;">
+        <div id="predEmpty" style="color:var(--ink-faint); font-size:11px; padding: 20px; text-align:center;">
+          No model loaded. Train one first.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="section-label" style="margin-bottom: 10px;">Metrics</div>
+    <div class="grid grid-4" style="gap: 0; border: 1px solid var(--edge);">
+      <div style="padding: 12px; border-right: 1px solid var(--edge);">
+        <div class="section-label" style="font-size:9px;">Road IoU (pred vs GT)</div>
+        <div class="nums" id="mIoU" style="font-size:20px; color: var(--ok); margin-top:4px;">&mdash;</div>
+      </div>
+      <div style="padding: 12px; border-right: 1px solid var(--edge);">
+        <div class="section-label" style="font-size:9px;">GT boxes</div>
+        <div class="nums" id="mGTBoxes" style="font-size:20px; margin-top:4px;">&mdash;</div>
+      </div>
+      <div style="padding: 12px; border-right: 1px solid var(--edge);">
+        <div class="section-label" style="font-size:9px;">Predicted boxes</div>
+        <div class="nums" id="mPredBoxes" style="font-size:20px; margin-top:4px;">&mdash;</div>
+      </div>
+      <div style="padding: 12px;">
+        <div class="section-label" style="font-size:9px;">Frame status</div>
+        <div class="nums" id="mStatus" style="font-size:13px; margin-top:4px;">&mdash;</div>
+      </div>
+    </div>
+    <div style="margin-top: 10px; font-size: 11px; color: var(--ink-faint); line-height: 1.5;">
+      <b>Road IoU</b> measures overlap between model\'s road prediction and the ground truth mask.
+      1.00 = perfect, 0.80+ = good, below 0.60 suggests the model needs more training or this frame is difficult.
+    </div>
+  </div>
+
+</main>
+
+<script>
+ForzaTek.mount('test');
+const { api, fmt } = ForzaTek;
+
+let currentFid = null;
+const frameHistory = [];
+
+async function loadFrame(id = null) {
+  try {
+    const url = id ? `/api/perception/test_frame?id=${id}` : '/api/perception/test_frame';
+    const r = await api.get(url);
+
+    currentFid = r.frame_id;
+    document.getElementById('frameIdPill').textContent = `FRAME #${r.frame_id}`;
+    document.getElementById('fidInput').value = r.frame_id;
+
+    // Track history for PREV
+    if (frameHistory[frameHistory.length - 1] !== r.frame_id) {
+      frameHistory.push(r.frame_id);
+      if (frameHistory.length > 50) frameHistory.shift();
+    }
+
+    // Original
+    const orig = document.getElementById('origImg');
+    orig.src = 'data:image/jpeg;base64,' + r.orig_b64;
+    orig.style.display = '';
+    orig.parentElement.querySelectorAll('div').forEach(d => { if (!d.classList.contains('label')) d.style.display = 'none'; });
+
+    // GT
+    const gt = document.getElementById('gtImg');
+    gt.src = 'data:image/jpeg;base64,' + r.gt_overlay_b64;
+    gt.style.display = '';
+    gt.parentElement.querySelectorAll('div').forEach(d => { if (!d.classList.contains('label')) d.style.display = 'none'; });
+
+    // Prediction
+    const pred = document.getElementById('predImg');
+    const predEmpty = document.getElementById('predEmpty');
+    const predBox = document.getElementById('predBox');
+    if (r.pred_overlay_b64) {
+      pred.src = 'data:image/jpeg;base64,' + r.pred_overlay_b64;
+      pred.style.display = '';
+      predEmpty.style.display = 'none';
+      document.getElementById('modelPill').textContent = 'MODEL LOADED';
+      document.getElementById('modelPill').className = 'pill pill-ok';
+    } else {
+      pred.style.display = 'none';
+      predEmpty.style.display = '';
+      predEmpty.textContent = r.has_model === false ? 'No model checkpoint found. Train one first.' : 'Prediction failed';
+      document.getElementById('modelPill').textContent = 'NO MODEL';
+      document.getElementById('modelPill').className = 'pill pill-danger';
+    }
+
+    // Metrics
+    if (r.pred_iou != null) {
+      const iou = r.pred_iou;
+      document.getElementById('mIoU').textContent = iou.toFixed(3);
+      const m = document.getElementById('mIoU');
+      m.style.color = iou >= 0.80 ? 'var(--ok)' : (iou >= 0.60 ? 'var(--warn)' : 'var(--danger)');
+      // Colour the prediction box frame
+      predBox.classList.remove('ok', 'warn', 'danger');
+      predBox.classList.add(iou >= 0.80 ? 'ok' : (iou >= 0.60 ? 'warn' : 'danger'));
+    } else {
+      document.getElementById('mIoU').textContent = '—';
+    }
+    document.getElementById('mGTBoxes').textContent = r.gt_det_count || 0;
+    document.getElementById('mPredBoxes').textContent = r.pred_det_count || 0;
+    document.getElementById('mStatus').textContent = (r.status || '').toUpperCase();
+  } catch (e) {
+    alert('Load failed: ' + e.message);
+  }
+}
+
+document.getElementById('randomBtn').addEventListener('click', () => loadFrame());
+document.getElementById('nextBtn').addEventListener('click', () => loadFrame());
+document.getElementById('prevBtn').addEventListener('click', () => {
+  if (frameHistory.length > 1) {
+    frameHistory.pop(); // current
+    const prev = frameHistory.pop();
+    if (prev) loadFrame(prev);
+  }
+});
+document.getElementById('goBtn').addEventListener('click', () => {
+  const v = parseInt(document.getElementById('fidInput').value);
+  if (v) loadFrame(v);
+});
+document.getElementById('fidInput').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('goBtn').click(); }
+});
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowRight' || e.key === 'n') loadFrame();
+  else if (e.key === 'ArrowLeft' || e.key === 'p') document.getElementById('prevBtn').click();
+  else if (e.key === 'r') loadFrame();
+});
+
+loadFrame();
+</script>
+</body>
+</html>
